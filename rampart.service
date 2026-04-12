@@ -1,0 +1,22 @@
+[Unit]
+Description=Rampart Unified Firewall Manager
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/rampart serve --config /etc/rampart/rampart.yaml
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+# Capability dropping is also handled by Rampart internally
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

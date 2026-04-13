@@ -2,6 +2,10 @@
 
 **Unified Network Policy Engine for Linux & Cloud**
 
+<p align="center">
+  <img src="assets/banner.jpeg" alt="Rampart Banner" width="100%">
+</p>
+
 Rampart is a high-performance network policy engine that abstracts the complexity of `nftables`, `iptables`, `eBPF/XDP`, and cloud security groups (AWS, GCP, Azure) behind a single, human-readable YAML policy-as-code interface.
 
 Built entirely in Go with zero external dependencies (beyond extended stdlib), Rampart provides a unified way to manage host-level and cloud-level firewalls with strong consistency, auditability, and safety.

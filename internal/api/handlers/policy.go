@@ -65,7 +65,7 @@ func (h *PolicyHandler) HandleApply(w http.ResponseWriter, r *http.Request) {
 		h.snapshotStore.Create("pre-apply", "Auto snapshot before policy apply", current)
 	}
 
-	if err := h.engine.Backend().Apply(compiled); err != nil {
+	if err := h.engine.Backend().Apply(r.Context(), compiled); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -120,7 +120,7 @@ func (h *PolicyHandler) HandleConflicts(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
-	if err := h.engine.Backend().Flush(); err != nil {
+	if err := h.engine.Backend().Flush(r.Context()); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

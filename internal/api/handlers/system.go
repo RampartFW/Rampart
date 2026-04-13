@@ -98,7 +98,7 @@ func (h *SystemHandler) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "rampart_rules_count %d\n", len(h.engine.CurrentRules().Rules))
 	}
 
-	stats, err := h.engine.Backend().Stats()
+	stats, err := h.engine.Backend().Stats(r.Context())
 	if err == nil {
 		fmt.Fprintf(w, "# HELP rampart_rule_packets_total Total packets matched by rule\n")
 		fmt.Fprintf(w, "# TYPE rampart_rule_packets_total counter\n")

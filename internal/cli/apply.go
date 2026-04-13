@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -62,7 +63,7 @@ func (c *ApplyCommand) Run(args []string) {
 	be, err := backend.AutoDetect()
 	ExitOnError(err, "Auto-detect backend")
 
-	current, err := be.CurrentState()
+	current, err := be.CurrentState(context.Background())
 	ExitOnError(err, "Get current state")
 
 	// 4. Generate plan
@@ -96,7 +97,7 @@ func (c *ApplyCommand) Run(args []string) {
 	ExitOnError(err, "Create snapshot")
 
 	// 8. Apply
-	err = be.Apply(compiled)
+	err = be.Apply(context.Background(), compiled)
 	ExitOnError(err, "Apply rules")
 
 	// 9. Audit

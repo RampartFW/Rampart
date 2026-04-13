@@ -1,0 +1,40 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Environment / local config
+.env
+.env.*
+!.env.example
+
+# Go
+bin/
+dist/
+build/
+vendor/
+coverage
+coverage.*
+cover.out
+*.coverprofile
+*.prof
+*.test
+*.out
+
+# Go cache / workspace
+.cache/
+.tmp/
+tmp/
+
+# Frontend
+ui/node_modules/
+ui/dist/
+ui/.vite/
+ui/.cache/
+ui/coverage/
+ui/*.tsbuildinfo

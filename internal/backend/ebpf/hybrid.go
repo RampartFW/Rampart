@@ -1,6 +1,7 @@
 package ebpf
 
 import (
+	"context"
 	"fmt"
 	"github.com/rampartfw/rampart/internal/backend"
 	"github.com/rampartfw/rampart/internal/model"
@@ -71,13 +72,13 @@ func (b *HybridBackend) Probe() error {
 	return nil
 }
 
-func (b *HybridBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *HybridBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	// Reconstruct state from both backends.
 	// For now, just return slow path as source of truth.
-	return b.slowPath.CurrentState()
+	return b.slowPath.CurrentState(ctx)
 }
 
-func (b *HybridBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *HybridBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	// Split rules between fast and slow path
 	fastRules := &model.CompiledRuleSet{
 		Metadata: rs.Metadata,
@@ -97,10 +98,10 @@ func (b *HybridBackend) Apply(rs *model.CompiledRuleSet) error {
 	}
 
 	// Apply to both
-	if err := b.fastPath.Apply(fastRules); err != nil {
+	if err := b.fastPath.Apply(ctx, fastRules); err != nil {
 		return fmt.Errorf("fast path apply failed: %w", err)
 	}
-	if err := b.slowPath.Apply(slowRules); err != nil {
+	if err := b.slowPath.Apply(ctx, slowRules); err != nil {
 		return fmt.Errorf("slow path apply failed: %w", err)
 	}
 
@@ -121,27 +122,27 @@ func (b *HybridBackend) isFastPathEligible(rule model.CompiledRule) bool {
 	return false
 }
 
-func (b *HybridBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
-	return b.slowPath.DryRun(rs)
+func (b *HybridBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+	return b.slowPath.DryRun(ctx, rs)
 }
 
-func (b *HybridBackend) Rollback(snapshot *model.Snapshot) error {
-	if err := b.fastPath.Rollback(snapshot); err != nil {
+func (b *HybridBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
+	if err := b.fastPath.Rollback(ctx, snapshot); err != nil {
 		return err
 	}
-	return b.slowPath.Rollback(snapshot)
+	return b.slowPath.Rollback(ctx, snapshot)
 }
 
-func (b *HybridBackend) Flush() error {
-	if err := b.fastPath.Flush(); err != nil {
+func (b *HybridBackend) Flush(ctx context.Context) error {
+	if err := b.fastPath.Flush(ctx); err != nil {
 		return err
 	}
-	return b.slowPath.Flush()
+	return b.slowPath.Flush(ctx)
 }
 
-func (b *HybridBackend) Stats() (map[string]model.RuleStats, error) {
-	fastStats, _ := b.fastPath.Stats()
-	slowStats, _ := b.slowPath.Stats()
+func (b *HybridBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
+	fastStats, _ := b.fastPath.Stats(ctx)
+	slowStats, _ := b.slowPath.Stats(ctx)
 
 	// Merge stats
 	allStats := make(map[string]model.RuleStats)

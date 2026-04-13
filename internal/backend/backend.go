@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"github.com/rampartfw/rampart/internal/model"
 )
 
@@ -16,22 +17,22 @@ type Backend interface {
 	Probe() error
 
 	// CurrentState returns the active firewall rules in normalized form
-	CurrentState() (*model.CompiledRuleSet, error)
+	CurrentState(ctx context.Context) (*model.CompiledRuleSet, error)
 
 	// Apply atomically applies a complete RuleSet, replacing all managed rules
-	Apply(rs *model.CompiledRuleSet) error
+	Apply(ctx context.Context, rs *model.CompiledRuleSet) error
 
 	// DryRun returns what Apply would do without actually doing it
-	DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error)
+	DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error)
 
 	// Rollback restores a previously captured snapshot
-	Rollback(snapshot *model.Snapshot) error
+	Rollback(ctx context.Context, snapshot *model.Snapshot) error
 
 	// Flush removes all Rampart-managed rules (leaves system rules intact)
-	Flush() error
+	Flush(ctx context.Context) error
 
 	// Stats returns per-rule packet/byte counters
-	Stats() (map[string]model.RuleStats, error)
+	Stats(ctx context.Context) (map[string]model.RuleStats, error)
 
 	// Close releases any resources held by the backend
 	Close() error

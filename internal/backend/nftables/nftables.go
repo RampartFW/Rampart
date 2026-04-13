@@ -1,6 +1,7 @@
 package nftables
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -68,8 +69,8 @@ type nftRule struct {
 	} `json:"rule"`
 }
 
-func (b *NFTablesBackend) CurrentState() (*model.CompiledRuleSet, error) {
-	cmd := exec.Command("nft", "-j", "list", "table", "inet", "rampart")
+func (b *NFTablesBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
+	cmd := exec.CommandContext(ctx, "nft", "-j", "list", "table", "inet", "rampart")
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -132,7 +133,7 @@ func (b *NFTablesBackend) parseNftRule(r nftRule) model.CompiledRule {
 	return rule
 }
 
-func (b *NFTablesBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *NFTablesBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	script := generateScript(rs)
 	tmpFile, err := os.CreateTemp("", "rampart-nft-*.nft")
 	if err != nil {
@@ -147,7 +148,7 @@ func (b *NFTablesBackend) Apply(rs *model.CompiledRuleSet) error {
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	cmd := exec.Command("nft", "-f", tmpFile.Name())
+	cmd := exec.CommandContext(ctx, "nft", "-f", tmpFile.Name())
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to apply nftables script: %s: %w", string(output), err)
 	}
@@ -155,8 +156,8 @@ func (b *NFTablesBackend) Apply(rs *model.CompiledRuleSet) error {
 	return nil
 }
 
-func (b *NFTablesBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
-	current, err := b.CurrentState()
+func (b *NFTablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+	current, err := b.CurrentState(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +176,7 @@ func (b *NFTablesBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPla
 	return plan, nil
 }
 
-func (b *NFTablesBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *NFTablesBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	// Reconstruct state from snapshot and apply
 	// SPEC says Snapshot.State is gob-encoded RuleSet
 	// But in my model it's []byte
@@ -185,8 +186,8 @@ func (b *NFTablesBackend) Rollback(snapshot *model.Snapshot) error {
 	return fmt.Errorf("rollback not fully implemented")
 }
 
-func (b *NFTablesBackend) Flush() error {
-	cmd := exec.Command("nft", "delete", "table", "inet", "rampart")
+func (b *NFTablesBackend) Flush(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "nft", "delete", "table", "inet", "rampart")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		stderr := string(output)
 		if strings.Contains(stderr, "No such file or directory") ||
@@ -205,8 +206,8 @@ type nftStats struct {
 	} `json:"counter"`
 }
 
-func (b *NFTablesBackend) Stats() (map[string]model.RuleStats, error) {
-	cmd := exec.Command("nft", "-j", "list", "table", "inet", "rampart")
+func (b *NFTablesBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
+	cmd := exec.CommandContext(ctx, "nft", "-j", "list", "table", "inet", "rampart")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nftables for stats: %w", err)

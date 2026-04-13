@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -57,7 +58,7 @@ func (c *PlanCommand) Run(args []string) {
 	be, err := backend.AutoDetect()
 	ExitOnError(err, "Auto-detect backend")
 
-	current, err := be.CurrentState()
+	current, err := be.CurrentState(context.Background())
 	ExitOnError(err, "Get current state")
 
 	// 4. Generate plan

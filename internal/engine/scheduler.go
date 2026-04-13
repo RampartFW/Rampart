@@ -113,6 +113,6 @@ func (s *Scheduler) evaluate() {
 	}
 
 	if changed {
-		s.engine.ReapplyRules()
+		s.engine.ReapplyRules(context.Background())
 	}
 }

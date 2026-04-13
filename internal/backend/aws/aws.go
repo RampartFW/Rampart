@@ -2,6 +2,7 @@ package aws
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,7 @@ type AWSBackend struct {
 	secretKey string
 	region    string
 	sgID      string
+	client    *http.Client
 }
 
 func init() {
@@ -27,6 +29,7 @@ func init() {
 			secretKey: cfg.Settings["secretKey"],
 			region:    cfg.Settings["region"],
 			sgID:      cfg.Settings["securityGroupId"],
+			client:    &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	})
 }
@@ -51,21 +54,21 @@ func (b *AWSBackend) Probe() error {
 	return nil
 }
 
-func (b *AWSBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *AWSBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	// DescribeSecurityGroupRules
 	return &model.CompiledRuleSet{
 		Rules: []model.CompiledRule{},
 	}, nil
 }
 
-func (b *AWSBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *AWSBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	// 1. Get current rules
 	// 2. Diff
 	// 3. Authorize/Revoke
 	return nil
 }
 
-func (b *AWSBackend) call(action string, params map[string]string) ([]byte, error) {
+func (b *AWSBackend) call(ctx context.Context, action string, params map[string]string) ([]byte, error) {
 	endpoint := fmt.Sprintf("https://ec2.%s.amazonaws.com/", b.region)
 	
 	// Create body
@@ -74,7 +77,7 @@ func (b *AWSBackend) call(action string, params map[string]string) ([]byte, erro
 		body += fmt.Sprintf("&%s=%s", k, v)
 	}
 
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBufferString(body))
 	if err != nil {
 		return nil, err
 	}
@@ -101,21 +104,21 @@ func (b *AWSBackend) call(action string, params map[string]string) ([]byte, erro
 	return respBody, nil
 }
 
-func (b *AWSBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+func (b *AWSBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
 	return &model.ExecutionPlan{
 		PlannedRuleCount: len(rs.Rules),
 	}, nil
 }
 
-func (b *AWSBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *AWSBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	return fmt.Errorf("rollback not implemented for aws")
 }
 
-func (b *AWSBackend) Flush() error {
+func (b *AWSBackend) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (b *AWSBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *AWSBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	return nil, nil // AWS SGs don't provide per-rule stats
 }
 

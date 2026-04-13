@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -51,7 +52,7 @@ func (f *PolicyFSM) applyPolicyUpdate(data []byte) error {
 	}
 
 	// Apply to backend
-	if err := f.backend.Apply(compiled); err != nil {
+	if err := f.backend.Apply(context.Background(), compiled); err != nil {
 		return fmt.Errorf("failed to apply policy to backend: %w", err)
 	}
 
@@ -61,7 +62,7 @@ func (f *PolicyFSM) applyPolicyUpdate(data []byte) error {
 // Snapshot returns a snapshot of the current state.
 func (f *PolicyFSM) Snapshot() ([]byte, error) {
 	// For Rampart, the state is the current compiled ruleset
-	state, err := f.backend.CurrentState()
+	state, err := f.backend.CurrentState(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -74,5 +75,5 @@ func (f *PolicyFSM) Restore(snapshot []byte) error {
 	if err := json.Unmarshal(snapshot, &rs); err != nil {
 		return err
 	}
-	return f.backend.Apply(&rs)
+	return f.backend.Apply(context.Background(), &rs)
 }

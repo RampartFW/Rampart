@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -51,7 +52,7 @@ func (c *RulesCommand) list(args []string) {
 	be, err := backend.AutoDetect()
 	ExitOnError(err, "Auto-detect backend")
 
-	current, err := be.CurrentState()
+	current, err := be.CurrentState(context.Background())
 	ExitOnError(err, "Get current state")
 
 	if Output == "json" {

@@ -26,6 +26,8 @@ type Store struct {
 	eventC   chan model.AuditEvent
 	lastHash string
 	maxAge   time.Duration
+	done     chan struct{}
+	wg       sync.WaitGroup
 }
 
 // NewStore creates a new audit store.
@@ -38,6 +40,7 @@ func NewStore(dir string, maxAge time.Duration) (*Store, error) {
 		dir:    dir,
 		eventC: make(chan model.AuditEvent, 1000),
 		maxAge: maxAge,
+		done:   make(chan struct{}),
 	}
 
 	// Initialize lastHash from the latest file
@@ -45,6 +48,7 @@ func NewStore(dir string, maxAge time.Duration) (*Store, error) {
 		return nil, err
 	}
 
+	s.wg.Add(2)
 	go s.runWriter()
 	go s.runMaintenance()
 
@@ -191,6 +195,7 @@ func (s *Store) VerifyIntegrity() (bool, error) {
 // Internal methods
 
 func (s *Store) runWriter() {
+	defer s.wg.Done()
 	for event := range s.eventC {
 		s.mu.Lock()
 		if err := s.writeEvent(event); err != nil {
@@ -200,7 +205,7 @@ func (s *Store) runWriter() {
 	}
 }
 
-func (s *Store) writeEvent(event model.AuditEvent) error {
+func (s *Store) writeEvent(event model.AuditEvent) (err error) {
 	today := time.Now().Format("2006-01-02")
 	filename := fmt.Sprintf("audit-%s.jsonl", today)
 	path := filepath.Join(s.dir, filename)
@@ -226,12 +231,16 @@ func (s *Store) writeEvent(event model.AuditEvent) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
-	if _, err := f.Write(finalJSON); err != nil {
+	if _, err = f.Write(finalJSON); err != nil {
 		return err
 	}
-	if _, err := f.Write([]byte("\n")); err != nil {
+	if _, err = f.Write([]byte("\n")); err != nil {
 		return err
 	}
 
@@ -427,6 +436,12 @@ func (s *Store) compressFile(path string) {
 		return
 	}
 
+	if err := gzw.Close(); err != nil {
+		return
+	}
+	if err := gzf.Close(); err != nil {
+		return
+	}
 	f.Close()
 	os.Remove(path)
 }
@@ -434,5 +449,6 @@ func (s *Store) compressFile(path string) {
 // Close closes the store and waits for the writer to finish.
 func (s *Store) Close() {
 	close(s.eventC)
-	// We could use a waitgroup here to wait for runWriter to finish
+	close(s.done)
+	s.wg.Wait()
 }

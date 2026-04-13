@@ -78,7 +78,7 @@ func (h *SnapshotHandler) HandleRollback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.engine.Backend().Apply(snapState); err != nil {
+	if err := h.engine.Backend().Apply(r.Context(), snapState); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

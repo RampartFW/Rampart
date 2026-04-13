@@ -54,7 +54,7 @@ func (h *RulesHandler) HandleAdd(w http.ResponseWriter, r *http.Request) {
 		Rules: newRules,
 	}
 
-	if err := h.engine.Backend().Apply(newSet); err != nil {
+	if err := h.engine.Backend().Apply(r.Context(), newSet); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -127,7 +127,7 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		Rules: newRules,
 	}
 
-	if err := h.engine.Backend().Apply(newSet); err != nil {
+	if err := h.engine.Backend().Apply(r.Context(), newSet); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -144,7 +144,7 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *RulesHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.engine.Backend().Stats()
+	stats, err := h.engine.Backend().Stats(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return

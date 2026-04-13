@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,12 +13,13 @@ import (
 )
 
 type GCPBackend struct {
-	cfg        backend.BackendConfig
-	projectID  string
-	network    string
-	keyFile    string
+	cfg         backend.BackendConfig
+	projectID   string
+	network     string
+	keyFile     string
 	accessToken string
 	expiry      time.Time
+	client      *http.Client
 }
 
 func init() {
@@ -27,6 +29,7 @@ func init() {
 			projectID: cfg.Settings["projectId"],
 			network:   cfg.Settings["network"],
 			keyFile:   cfg.Settings["keyFile"],
+			client:    &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	})
 }
@@ -51,14 +54,14 @@ func (b *GCPBackend) Probe() error {
 	return nil
 }
 
-func (b *GCPBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *GCPBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	// List GCP Firewall Rules
 	return &model.CompiledRuleSet{
 		Rules: []model.CompiledRule{},
 	}, nil
 }
 
-func (b *GCPBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *GCPBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	// 1. Get current rules
 	// 2. Diff
 	// 3. Create/Delete rules
@@ -79,13 +82,13 @@ func (b *GCPBackend) getAccessToken() (string, error) {
 	return "placeholder-token", nil
 }
 
-func (b *GCPBackend) call(method, url string, body []byte) ([]byte, error) {
+func (b *GCPBackend) call(ctx context.Context, method, url string, body []byte) ([]byte, error) {
 	token, err := b.getAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +96,7 @@ func (b *GCPBackend) call(method, url string, body []byte) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := b.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -112,21 +114,21 @@ func (b *GCPBackend) call(method, url string, body []byte) ([]byte, error) {
 	return respBody, nil
 }
 
-func (b *GCPBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+func (b *GCPBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
 	return &model.ExecutionPlan{
 		PlannedRuleCount: len(rs.Rules),
 	}, nil
 }
 
-func (b *GCPBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *GCPBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	return fmt.Errorf("rollback not implemented for gcp")
 }
 
-func (b *GCPBackend) Flush() error {
+func (b *GCPBackend) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (b *GCPBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *GCPBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	return nil, nil // GCP doesn't provide per-rule stats in this API
 }
 

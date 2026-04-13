@@ -3,6 +3,7 @@
 package ebpf
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"unsafe"
@@ -56,7 +57,7 @@ func (b *EBPFBackend) Probe() error {
 	return nil
 }
 
-func (b *EBPFBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *EBPFBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	// eBPF state is in maps. It's hard to reconstruct exactly.
 	// We'll return empty for now, or just the metadata.
 	return &model.CompiledRuleSet{
@@ -64,7 +65,7 @@ func (b *EBPFBackend) CurrentState() (*model.CompiledRuleSet, error) {
 	}, nil
 }
 
-func (b *EBPFBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *EBPFBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	if b.iface == "" {
 		return fmt.Errorf("interface must be specified for ebpf backend")
 	}
@@ -175,17 +176,17 @@ func (b *EBPFBackend) updateMaps(rs *model.CompiledRuleSet) error {
 	return nil
 }
 
-func (b *EBPFBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+func (b *EBPFBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
 	return &model.ExecutionPlan{
 		PlannedRuleCount: len(rs.Rules),
 	}, nil
 }
 
-func (b *EBPFBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *EBPFBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	return fmt.Errorf("rollback not implemented for ebpf")
 }
 
-func (b *EBPFBackend) Flush() error {
+func (b *EBPFBackend) Flush(ctx context.Context) error {
 	// Close FDs
 	for _, fd := range b.maps {
 		unix.Close(fd)
@@ -196,10 +197,10 @@ func (b *EBPFBackend) Flush() error {
 	return nil
 }
 
-func (b *EBPFBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *EBPFBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	return make(map[string]model.RuleStats), nil
 }
 
 func (b *EBPFBackend) Close() error {
-	return b.Flush()
+	return b.Flush(context.Background())
 }

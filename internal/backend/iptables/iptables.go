@@ -3,6 +3,7 @@ package iptables
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -55,13 +56,13 @@ func (b *IptablesBackend) Probe() error {
 	return nil
 }
 
-func (b *IptablesBackend) CurrentState() (*model.CompiledRuleSet, error) {
-	rules, err := b.getManagedRules("iptables-save")
+func (b *IptablesBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
+	rules, err := b.getManagedRules(ctx, "iptables-save")
 	if err != nil {
 		return nil, err
 	}
 
-	ipv6Rules, err := b.getManagedRules("ip6tables-save")
+	ipv6Rules, err := b.getManagedRules(ctx, "ip6tables-save")
 	if err == nil {
 		rules = append(rules, ipv6Rules...)
 	}
@@ -72,13 +73,13 @@ func (b *IptablesBackend) CurrentState() (*model.CompiledRuleSet, error) {
 	}, nil
 }
 
-func (b *IptablesBackend) getManagedRules(command string) ([]model.CompiledRule, error) {
+func (b *IptablesBackend) getManagedRules(ctx context.Context, command string) ([]model.CompiledRule, error) {
 	_, err := exec.LookPath(command)
 	if err != nil {
 		return nil, nil // If command doesn't exist, return no rules
 	}
 
-	cmd := exec.Command(command)
+	cmd := exec.CommandContext(ctx, command)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run %s: %w", command, err)
@@ -139,15 +140,15 @@ func (b *IptablesBackend) parseRuleLine(line string) model.CompiledRule {
 	return rule
 }
 
-func (b *IptablesBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *IptablesBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	// Chain Swap Strategy
 	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
 
 	// 1. Create NEW chains
 	for _, chain := range chains {
 		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
-		b.exec("iptables", "-N", newChain)
-		b.exec("ip6tables", "-N", newChain)
+		b.exec(ctx, "iptables", "-N", newChain)
+		b.exec(ctx, "ip6tables", "-N", newChain)
 	}
 
 	// 2. Populate NEW chains
@@ -159,8 +160,8 @@ func (b *IptablesBackend) Apply(rs *model.CompiledRuleSet) error {
 		
 		chain := b.directionToChain(rule.Direction) + "-NEW"
 		args := ruleToArgs(rule, chain)
-		if err := b.exec(cmd, args...); err != nil {
-			b.cleanupNewChains()
+		if err := b.exec(ctx, cmd, args...); err != nil {
+			b.cleanupNewChains(ctx)
 			return fmt.Errorf("failed to add rule %s: %w", rule.Name, err)
 		}
 	}
@@ -171,13 +172,13 @@ func (b *IptablesBackend) Apply(rs *model.CompiledRuleSet) error {
 		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
 
 		// Create rampart chain if it doesn't exist
-		b.exec("iptables", "-N", rampartChain)
-		b.exec("ip6tables", "-N", rampartChain)
+		b.exec(ctx, "iptables", "-N", rampartChain)
+		b.exec(ctx, "ip6tables", "-N", rampartChain)
 
 		// Ensure jumps from base chains (INPUT/FORWARD/OUTPUT) to our RAMPART chains
 		// This part is tricky as it affects traffic.
 		// Usually we'd want to have a permanent jump to RAMPART-INPUT at the top of INPUT.
-		b.ensureJump(chain, rampartChain)
+		b.ensureJump(ctx, chain, rampartChain)
 
 		// Now swap rules from rampartChain to newChain content
 		// Efficient swap:
@@ -189,18 +190,18 @@ func (b *IptablesBackend) Apply(rs *model.CompiledRuleSet) error {
 		// 3. Rename/Swap.
 		
 		// Let's do the strategy from §8.1 of IMPLEMENTATION.md
-		b.exec("iptables", "-I", chain, "1", "-j", newChain)
-		b.exec("iptables", "-D", chain, "-j", rampartChain)
-		b.exec("iptables", "-F", rampartChain)
-		b.exec("iptables", "-X", rampartChain)
-		b.exec("iptables", "-E", newChain, rampartChain)
+		b.exec(ctx, "iptables", "-I", chain, "1", "-j", newChain)
+		b.exec(ctx, "iptables", "-D", chain, "-j", rampartChain)
+		b.exec(ctx, "iptables", "-F", rampartChain)
+		b.exec(ctx, "iptables", "-X", rampartChain)
+		b.exec(ctx, "iptables", "-E", newChain, rampartChain)
 		
 		// Same for IPv6
-		b.exec("ip6tables", "-I", chain, "1", "-j", newChain)
-		b.exec("ip6tables", "-D", chain, "-j", rampartChain)
-		b.exec("ip6tables", "-F", rampartChain)
-		b.exec("ip6tables", "-X", rampartChain)
-		b.exec("ip6tables", "-E", newChain, rampartChain)
+		b.exec(ctx, "ip6tables", "-I", chain, "1", "-j", newChain)
+		b.exec(ctx, "ip6tables", "-D", chain, "-j", rampartChain)
+		b.exec(ctx, "ip6tables", "-F", rampartChain)
+		b.exec(ctx, "ip6tables", "-X", rampartChain)
+		b.exec(ctx, "ip6tables", "-E", newChain, rampartChain)
 	}
 
 	return nil
@@ -219,44 +220,44 @@ func (b *IptablesBackend) directionToChain(d model.Direction) string {
 	}
 }
 
-func (b *IptablesBackend) ensureJump(base, target string) {
+func (b *IptablesBackend) ensureJump(ctx context.Context, base, target string) {
 	// Check if jump exists
-	if !b.jumpExists(base, target) {
-		b.exec("iptables", "-I", base, "1", "-j", target)
+	if !b.jumpExists(ctx, base, target) {
+		b.exec(ctx, "iptables", "-I", base, "1", "-j", target)
 	}
-	if !b.jumpExists6(base, target) {
-		b.exec("ip6tables", "-I", base, "1", "-j", target)
+	if !b.jumpExists6(ctx, base, target) {
+		b.exec(ctx, "ip6tables", "-I", base, "1", "-j", target)
 	}
 }
 
-func (b *IptablesBackend) jumpExists(base, target string) bool {
-	output, _ := exec.Command("iptables", "-S", base).Output()
+func (b *IptablesBackend) jumpExists(ctx context.Context, base, target string) bool {
+	output, _ := exec.CommandContext(ctx, "iptables", "-S", base).Output()
 	return strings.Contains(string(output), "-j "+target)
 }
 
-func (b *IptablesBackend) jumpExists6(base, target string) bool {
-	output, _ := exec.Command("ip6tables", "-S", base).Output()
+func (b *IptablesBackend) jumpExists6(ctx context.Context, base, target string) bool {
+	output, _ := exec.CommandContext(ctx, "ip6tables", "-S", base).Output()
 	return strings.Contains(string(output), "-j "+target)
 }
 
-func (b *IptablesBackend) cleanupNewChains() {
+func (b *IptablesBackend) cleanupNewChains(ctx context.Context) {
 	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
 	for _, chain := range chains {
 		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
-		b.exec("iptables", "-F", newChain)
-		b.exec("iptables", "-X", newChain)
-		b.exec("ip6tables", "-F", newChain)
-		b.exec("ip6tables", "-X", newChain)
+		b.exec(ctx, "iptables", "-F", newChain)
+		b.exec(ctx, "iptables", "-X", newChain)
+		b.exec(ctx, "ip6tables", "-F", newChain)
+		b.exec(ctx, "ip6tables", "-X", newChain)
 	}
 }
 
-func (b *IptablesBackend) exec(cmd string, args ...string) error {
-	c := exec.Command(cmd, args...)
+func (b *IptablesBackend) exec(ctx context.Context, cmd string, args ...string) error {
+	c := exec.CommandContext(ctx, cmd, args...)
 	return c.Run()
 }
 
-func (b *IptablesBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
-	current, err := b.CurrentState()
+func (b *IptablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+	current, err := b.CurrentState(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -267,31 +268,31 @@ func (b *IptablesBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPla
 	}, nil
 }
 
-func (b *IptablesBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *IptablesBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	// Reconstruct state and apply
 	return fmt.Errorf("rollback not fully implemented")
 }
 
-func (b *IptablesBackend) Flush() error {
+func (b *IptablesBackend) Flush(ctx context.Context) error {
 	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
 	for _, chain := range chains {
 		rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
-		b.exec("iptables", "-D", chain, "-j", rampartChain)
-		b.exec("iptables", "-F", rampartChain)
-		b.exec("iptables", "-X", rampartChain)
+		b.exec(ctx, "iptables", "-D", chain, "-j", rampartChain)
+		b.exec(ctx, "iptables", "-F", rampartChain)
+		b.exec(ctx, "iptables", "-X", rampartChain)
 		
-		b.exec("ip6tables", "-D", chain, "-j", rampartChain)
-		b.exec("ip6tables", "-F", rampartChain)
-		b.exec("ip6tables", "-X", rampartChain)
+		b.exec(ctx, "ip6tables", "-D", chain, "-j", rampartChain)
+		b.exec(ctx, "ip6tables", "-F", rampartChain)
+		b.exec(ctx, "ip6tables", "-X", rampartChain)
 	}
 	return nil
 }
 
-func (b *IptablesBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *IptablesBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	stats := make(map[string]model.RuleStats)
 
 	// Get stats for IPv4
-	ipv4Stats, err := b.getStats("iptables")
+	ipv4Stats, err := b.getStats(ctx, "iptables")
 	if err == nil {
 		for k, v := range ipv4Stats {
 			stats[k] = v
@@ -299,7 +300,7 @@ func (b *IptablesBackend) Stats() (map[string]model.RuleStats, error) {
 	}
 
 	// Get stats for IPv6
-	ipv6Stats, err := b.getStats("ip6tables")
+	ipv6Stats, err := b.getStats(ctx, "ip6tables")
 	if err == nil {
 		for k, v := range ipv6Stats {
 			stats[k] = v
@@ -309,7 +310,7 @@ func (b *IptablesBackend) Stats() (map[string]model.RuleStats, error) {
 	return stats, nil
 }
 
-func (b *IptablesBackend) getStats(command string) (map[string]model.RuleStats, error) {
+func (b *IptablesBackend) getStats(ctx context.Context, command string) (map[string]model.RuleStats, error) {
 	_, err := exec.LookPath(command)
 	if err != nil {
 		return nil, nil
@@ -320,7 +321,7 @@ func (b *IptablesBackend) getStats(command string) (map[string]model.RuleStats, 
 
 	for _, chain := range chains {
 		rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
-		cmd := exec.Command(command, "-L", rampartChain, "-v", "-n", "-x")
+		cmd := exec.CommandContext(ctx, command, "-L", rampartChain, "-v", "-n", "-x")
 		output, err := cmd.Output()
 		if err != nil {
 			continue // Chain might not exist

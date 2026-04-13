@@ -2,6 +2,7 @@ package azure
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ type AzureBackend struct {
 	clientSecret   string
 	accessToken    string
 	expiry         time.Time
+	client         *http.Client
 }
 
 func init() {
@@ -35,6 +37,7 @@ func init() {
 			tenantID:       cfg.Settings["tenantId"],
 			clientID:       cfg.Settings["clientId"],
 			clientSecret:   cfg.Settings["clientSecret"],
+			client:         &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	})
 }
@@ -59,21 +62,21 @@ func (b *AzureBackend) Probe() error {
 	return nil
 }
 
-func (b *AzureBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *AzureBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	// List Azure NSG Security Rules
 	return &model.CompiledRuleSet{
 		Rules: []model.CompiledRule{},
 	}, nil
 }
 
-func (b *AzureBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *AzureBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	// 1. Get current rules
 	// 2. Diff
 	// 3. Create/Delete rules
 	return nil
 }
 
-func (b *AzureBackend) getAccessToken() (string, error) {
+func (b *AzureBackend) getAccessToken(ctx context.Context) (string, error) {
 	if b.accessToken != "" && time.Now().Before(b.expiry) {
 		return b.accessToken, nil
 	}
@@ -85,14 +88,13 @@ func (b *AzureBackend) getAccessToken() (string, error) {
 	data.Set("client_secret", b.clientSecret)
 	data.Set("resource", "https://management.azure.com/")
 
-	req, err := http.NewRequest("POST", authURL, bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", authURL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := b.client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -116,8 +118,8 @@ func (b *AzureBackend) getAccessToken() (string, error) {
 	return b.accessToken, nil
 }
 
-func (b *AzureBackend) call(method, relativeURL string, body []byte) ([]byte, error) {
-	token, err := b.getAccessToken()
+func (b *AzureBackend) call(ctx context.Context, method, relativeURL string, body []byte) ([]byte, error) {
+	token, err := b.getAccessToken(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +127,7 @@ func (b *AzureBackend) call(method, relativeURL string, body []byte) ([]byte, er
 	baseURL := "https://management.azure.com"
 	fullURL := baseURL + relativeURL
 
-	req, err := http.NewRequest(method, fullURL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +135,7 @@ func (b *AzureBackend) call(method, relativeURL string, body []byte) ([]byte, er
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := b.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -152,21 +153,21 @@ func (b *AzureBackend) call(method, relativeURL string, body []byte) ([]byte, er
 	return respBody, nil
 }
 
-func (b *AzureBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+func (b *AzureBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
 	return &model.ExecutionPlan{
 		PlannedRuleCount: len(rs.Rules),
 	}, nil
 }
 
-func (b *AzureBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *AzureBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	return fmt.Errorf("rollback not implemented for azure")
 }
 
-func (b *AzureBackend) Flush() error {
+func (b *AzureBackend) Flush(ctx context.Context) error {
 	return nil
 }
 
-func (b *AzureBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *AzureBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	return nil, nil // Azure NSG doesn't provide real-time per-rule stats in this API
 }
 

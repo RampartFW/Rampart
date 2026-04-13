@@ -3,6 +3,7 @@
 package ebpf
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rampartfw/rampart/internal/backend"
@@ -31,27 +32,27 @@ func (b *EBPFBackend) Probe() error {
 	return fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) CurrentState() (*model.CompiledRuleSet, error) {
+func (b *EBPFBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
 	return nil, fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) Apply(rs *model.CompiledRuleSet) error {
+func (b *EBPFBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
 	return fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) DryRun(rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
+func (b *EBPFBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {
 	return nil, fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) Rollback(snapshot *model.Snapshot) error {
+func (b *EBPFBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
 	return fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) Flush() error {
+func (b *EBPFBackend) Flush(ctx context.Context) error {
 	return fmt.Errorf("ebpf backend only supported on Linux")
 }
 
-func (b *EBPFBackend) Stats() (map[string]model.RuleStats, error) {
+func (b *EBPFBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	return nil, fmt.Errorf("ebpf backend only supported on Linux")
 }
 

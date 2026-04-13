@@ -203,10 +203,38 @@ func (s *Store) readIndex() ([]model.Snapshot, error) {
 
 func (s *Store) writeIndex(snaps []model.Snapshot) error {
 	path := filepath.Join(s.dir, "snapshots.json")
+	tmpPath := path + ".tmp"
 	data, err := json.MarshalIndent(snaps, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	return nil
 }

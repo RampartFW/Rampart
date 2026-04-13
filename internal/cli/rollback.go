@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ func (c *RollbackCommand) Run(args []string) {
 
 	fmt.Printf("Rolling back to snapshot %s (%s)...\n", s.ID, s.Description)
 
-	err = be.Apply(rs)
+	err = be.Apply(context.Background(), rs)
 	ExitOnError(err, "Apply snapshot")
 
 	fmt.Printf("%s Successfully rolled back to %s\n", Colorize("✓", colorGreen), id)

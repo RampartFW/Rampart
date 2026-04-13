@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"sync"
 	"github.com/rampartfw/rampart/internal/backend"
 	"github.com/rampartfw/rampart/internal/model"
@@ -38,7 +39,7 @@ func (e *Engine) SetRules(rs *model.CompiledRuleSet) {
 }
 
 // ReapplyRules reapplies the current ruleset to the backend.
-func (e *Engine) ReapplyRules() error {
+func (e *Engine) ReapplyRules(ctx context.Context) error {
 	e.mu.RLock()
 	rs := e.currentRules
 	e.mu.RUnlock()
@@ -47,7 +48,7 @@ func (e *Engine) ReapplyRules() error {
 		return nil
 	}
 
-	return e.backend.Apply(rs)
+	return e.backend.Apply(ctx, rs)
 }
 
 // Backend returns the engine's backend.

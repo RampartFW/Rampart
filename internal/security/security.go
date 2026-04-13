@@ -26,6 +26,7 @@ type RateLimiter struct {
 	limits map[string]*tokenBucket
 	rate   float64
 	burst  int
+	stop   chan struct{}
 }
 
 type tokenBucket struct {
@@ -34,10 +35,42 @@ type tokenBucket struct {
 }
 
 func NewRateLimiter(rate float64, burst int) *RateLimiter {
-	return &RateLimiter{
+	l := &RateLimiter{
 		limits: make(map[string]*tokenBucket),
 		rate:   rate,
 		burst:  burst,
+		stop:   make(chan struct{}),
+	}
+	go l.cleanupLoop()
+	return l
+}
+
+func (l *RateLimiter) Stop() {
+	close(l.stop)
+}
+
+func (l *RateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			l.cleanup()
+		case <-l.stop:
+			return
+		}
+	}
+}
+
+func (l *RateLimiter) cleanup() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	for k, tb := range l.limits {
+		// If the bucket hasn't been used in 10 minutes, remove it
+		if now.Sub(tb.last) > 10*time.Minute {
+			delete(l.limits, k)
+		}
 	}
 }
 

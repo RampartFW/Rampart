@@ -12,8 +12,6 @@ import (
 	"github.com/rampartfw/rampart/internal/model"
 )
 
-// NodeState is defined in model.
-
 // RaftNode represents a single node in the Raft cluster.
 type RaftNode struct {
 	mu sync.RWMutex
@@ -37,8 +35,11 @@ type RaftNode struct {
 	electionTimer  *time.Timer
 	heartbeatTimer *time.Timer
 
+	proposals map[uint64]chan error
+
 	ctx    context.Context
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 // Transport defines the interface for Raft RPCs.
@@ -110,6 +111,7 @@ func NewRaftNode(id string, peers map[string]string, transport Transport, log *L
 		fsm:        fsm,
 		nextIndex:  make(map[string]uint64),
 		matchIndex: make(map[string]uint64),
+		proposals:  make(map[uint64]chan error),
 		ctx:        ctx,
 		cancel:     cancel,
 	}
@@ -125,11 +127,13 @@ func (rn *RaftNode) Start(address string) error {
 	rn.resetElectionTimer()
 	rn.mu.Unlock()
 
+	rn.wg.Add(1)
 	go rn.run()
 	return nil
 }
 
 func (rn *RaftNode) run() {
+	defer rn.wg.Done()
 	for {
 		select {
 		case <-rn.ctx.Done():
@@ -171,7 +175,9 @@ func (rn *RaftNode) startElection() {
 			continue
 		}
 
+		rn.wg.Add(1)
 		go func(peerID, addr string) {
+			defer rn.wg.Done()
 			req := RequestVoteRequest{
 				Term:         term,
 				CandidateID:  rn.id,
@@ -185,12 +191,9 @@ func (rn *RaftNode) startElection() {
 			}
 
 			rn.mu.Lock()
+			defer rn.mu.Unlock()
 			if resp.Term > rn.currentTerm {
-				rn.state = model.StateFollower
-				rn.currentTerm = resp.Term
-				rn.votedFor = ""
-				rn.resetElectionTimer()
-				rn.mu.Unlock()
+				rn.stepDown(resp.Term)
 				return
 			}
 
@@ -202,8 +205,20 @@ func (rn *RaftNode) startElection() {
 				}
 				votesMu.Unlock()
 			}
-			rn.mu.Unlock()
 		}(peerID, addr)
+	}
+}
+
+func (rn *RaftNode) stepDown(term uint64) {
+	rn.state = model.StateFollower
+	rn.currentTerm = term
+	rn.votedFor = ""
+	rn.resetElectionTimer()
+	
+	// Notify all pending proposals that we are no longer leader
+	for idx, ch := range rn.proposals {
+		ch <- fmt.Errorf("stepped down from leader")
+		delete(rn.proposals, idx)
 	}
 }
 
@@ -223,10 +238,12 @@ func (rn *RaftNode) becomeLeader() {
 	}
 	rn.heartbeatTimer = time.NewTimer(50 * time.Millisecond)
 
+	rn.wg.Add(1)
 	go rn.leaderLoop()
 }
 
 func (rn *RaftNode) leaderLoop() {
+	defer rn.wg.Done()
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -252,7 +269,9 @@ func (rn *RaftNode) replicateLog() {
 			continue
 		}
 
+		rn.wg.Add(1)
 		go func(peerID, addr string) {
+			defer rn.wg.Done()
 			rn.mu.RLock()
 			if rn.state != model.StateLeader {
 				rn.mu.RUnlock()
@@ -288,10 +307,7 @@ func (rn *RaftNode) replicateLog() {
 			defer rn.mu.Unlock()
 
 			if resp.Term > rn.currentTerm {
-				rn.state = model.StateFollower
-				rn.currentTerm = resp.Term
-				rn.votedFor = ""
-				rn.resetElectionTimer()
+				rn.stepDown(resp.Term)
 				return
 			}
 
@@ -333,7 +349,15 @@ func (rn *RaftNode) applyEntries() {
 	for rn.lastApplied < rn.commitIndex {
 		rn.lastApplied++
 		if entry, ok := rn.log.Get(rn.lastApplied); ok {
-			rn.fsm.Apply(entry)
+			err := rn.fsm.Apply(entry)
+			
+			// Notify proposer if we are the leader
+			if rn.state == model.StateLeader {
+				if ch, ok := rn.proposals[entry.Index]; ok {
+					ch <- err
+					delete(rn.proposals, entry.Index)
+				}
+			}
 		}
 	}
 }
@@ -354,10 +378,7 @@ func (rn *RaftNode) HandleRequestVote(req RequestVoteRequest) (RequestVoteRespon
 	}
 
 	if req.Term > rn.currentTerm {
-		rn.state = model.StateFollower
-		rn.currentTerm = req.Term
-		rn.votedFor = ""
-		rn.resetElectionTimer()
+		rn.stepDown(req.Term)
 	}
 
 	lastLog := rn.log.LastEntry()
@@ -387,9 +408,7 @@ func (rn *RaftNode) HandleAppendEntries(req AppendEntriesRequest) (AppendEntries
 	}
 
 	if req.Term > rn.currentTerm || rn.state != model.StateFollower {
-		rn.state = model.StateFollower
-		rn.currentTerm = req.Term
-		rn.votedFor = ""
+		rn.stepDown(req.Term)
 	}
 	rn.resetElectionTimer()
 
@@ -440,9 +459,10 @@ func (rn *RaftNode) Propose(entryType model.EntryType, data []byte) error {
 	}
 
 	lastLog := rn.log.LastEntry()
+	index := lastLog.Index + 1
 	entry := model.LogEntry{
 		Term:      rn.currentTerm,
-		Index:     lastLog.Index + 1,
+		Index:     index,
 		Type:      entryType,
 		Data:      data,
 		Timestamp: time.Now(),
@@ -452,11 +472,23 @@ func (rn *RaftNode) Propose(entryType model.EntryType, data []byte) error {
 		rn.mu.Unlock()
 		return err
 	}
+
+	ch := make(chan error, 1)
+	rn.proposals[index] = ch
 	rn.mu.Unlock()
 
-	// Wait for entry to be committed (simplified)
-	// In a real implementation, we would use a channel to notify completion
-	return nil
+	// Wait for entry to be committed
+	select {
+	case err := <-ch:
+		return err
+	case <-rn.ctx.Done():
+		return rn.ctx.Err()
+	case <-time.After(5 * time.Second):
+		rn.mu.Lock()
+		delete(rn.proposals, index)
+		rn.mu.Unlock()
+		return fmt.Errorf("proposal timed out")
+	}
 }
 
 // Status returns the current status of the node.
@@ -482,5 +514,13 @@ func (rn *RaftNode) Close() error {
 	if rn.heartbeatTimer != nil {
 		rn.heartbeatTimer.Stop()
 	}
+	
+	// Cleanup proposals
+	for idx, ch := range rn.proposals {
+		ch <- fmt.Errorf("closing node")
+		delete(rn.proposals, idx)
+	}
+
+	rn.wg.Wait()
 	return rn.transport.Close()
 }

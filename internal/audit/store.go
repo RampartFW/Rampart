@@ -77,8 +77,6 @@ func (s *Store) Get(id string) (*model.AuditEvent, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// This is inefficient but necessary if we don't have an index
-	// We scan files backwards from newest to oldest
 	files, err := s.listAuditFiles()
 	if err != nil {
 		return nil, err
@@ -106,7 +104,6 @@ func (s *Store) Search(query AuditQuery) ([]model.AuditEvent, int, error) {
 	}
 
 	for _, f := range files {
-		// Optimization: skip files that are outside the time range
 		if !s.fileMightContainRange(f, query.Since, query.Until) {
 			continue
 		}
@@ -124,14 +121,11 @@ func (s *Store) Search(query AuditQuery) ([]model.AuditEvent, int, error) {
 		}
 	}
 
-	// Sort results by timestamp (newest first)
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Timestamp.After(results[j].Timestamp)
 	})
 
 	total := len(results)
-	
-	// Apply offset and limit
 	start := query.Offset
 	if start > total {
 		start = total
@@ -154,7 +148,6 @@ func (s *Store) VerifyIntegrity() (bool, error) {
 		return false, err
 	}
 
-	// Sort oldest first for verification
 	sort.Strings(files)
 
 	currentHash := ""
@@ -165,18 +158,6 @@ func (s *Store) VerifyIntegrity() (bool, error) {
 		}
 
 		for _, e := range events {
-			// Compute hash: SHA-256(prev_hash + entry_json_without_hash)
-			// Actually the requirement says entry_json.
-			// Let's see how we write it.
-			// If we write hash in the entry, we should probably exclude it from the hash calculation
-			// or hash the entry as it was before adding the hash.
-			
-			// We'll follow the implementation: hash = SHA-256(prev_hash + entry_json)
-			// This means entry_json MUST NOT contain the hash itself yet.
-			
-			// Let's re-read T-018:
-			// Hash chain: each entry's hash = SHA-256(prev_hash + entry_json)
-			
 			hash := e.ChainHash
 			e.ChainHash = ""
 			entryJSON, _ := json.Marshal(e)
@@ -191,8 +172,6 @@ func (s *Store) VerifyIntegrity() (bool, error) {
 
 	return true, nil
 }
-
-// Internal methods
 
 func (s *Store) runWriter() {
 	defer s.wg.Done()
@@ -210,18 +189,15 @@ func (s *Store) writeEvent(event model.AuditEvent) (err error) {
 	filename := fmt.Sprintf("audit-%s.jsonl", today)
 	path := filepath.Join(s.dir, filename)
 
-	// JSON without hash
 	event.ChainHash = ""
 	entryJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 
-	// Compute hash chain
 	event.ChainHash = s.computeHash(s.lastHash, entryJSON)
 	s.lastHash = event.ChainHash
 
-	// Final JSON with hash
 	finalJSON, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -265,7 +241,6 @@ func (s *Store) initLastHash() error {
 		return nil
 	}
 
-	// Latest file
 	latestFile := files[0]
 	events, err := s.readAllFromFile(latestFile)
 	if err != nil {
@@ -292,7 +267,6 @@ func (s *Store) listAuditFiles() ([]string, error) {
 		}
 	}
 
-	// Sort newest first
 	sort.Slice(files, func(i, j int) bool {
 		return files[i] > files[j]
 	})
@@ -334,6 +308,9 @@ func (s *Store) readAllFromFile(path string) ([]model.AuditEvent, error) {
 
 	var events []model.AuditEvent
 	scanner := bufio.NewScanner(r)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
 	for scanner.Scan() {
 		var e model.AuditEvent
 		if err := json.Unmarshal(scanner.Bytes(), &e); err != nil {
@@ -346,7 +323,6 @@ func (s *Store) readAllFromFile(path string) ([]model.AuditEvent, error) {
 }
 
 func (s *Store) fileMightContainRange(path string, since, until time.Time) bool {
-	// Filename format: audit-2026-04-11.jsonl
 	base := filepath.Base(path)
 	if !strings.HasPrefix(base, "audit-") {
 		return true
@@ -367,9 +343,16 @@ func (s *Store) fileMightContainRange(path string, since, until time.Time) bool 
 }
 
 func (s *Store) runMaintenance() {
+	defer s.wg.Done()
 	ticker := time.NewTicker(1 * time.Hour)
-	for range ticker.C {
-		s.maintenance()
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.maintenance()
+		case <-s.done:
+			return
+		}
 	}
 }
 
@@ -383,7 +366,6 @@ func (s *Store) maintenance() {
 	}
 
 	today := time.Now().Format("2006-01-02")
-	
 	cutoff := time.Now().Add(-s.maxAge)
 
 	for _, entry := range entries {
@@ -402,13 +384,11 @@ func (s *Store) maintenance() {
 			continue
 		}
 
-		// Retention cleanup
 		if fileDate.Before(cutoff) {
 			os.Remove(filepath.Join(s.dir, name))
 			continue
 		}
 
-		// Compression (older than today and not already compressed)
 		if dateStr != today && !strings.HasSuffix(name, ".gz") {
 			s.compressFile(filepath.Join(s.dir, name))
 		}
@@ -430,16 +410,20 @@ func (s *Store) compressFile(path string) {
 	defer gzf.Close()
 
 	gzw := gzip.NewWriter(gzf)
-	defer gzw.Close()
-
 	if _, err := io.Copy(gzw, f); err != nil {
+		gzw.Close()
+		gzf.Close()
+		os.Remove(gzPath)
 		return
 	}
 
 	if err := gzw.Close(); err != nil {
+		gzf.Close()
+		os.Remove(gzPath)
 		return
 	}
 	if err := gzf.Close(); err != nil {
+		os.Remove(gzPath)
 		return
 	}
 	f.Close()

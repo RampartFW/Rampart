@@ -15,7 +15,7 @@ import (
 
 func TestAuditHandlers(t *testing.T) {
 	// Setup
-	tmpDir, _ := os.MkdirTemp("", "rampart-audit-test-*")
+	tmpDir, _ := os.MkdirTemp("", "rampart-audit-api-test-*")
 	defer os.RemoveAll(tmpDir)
 
 	auditStore, _ := audit.NewStore(tmpDir, time.Hour)

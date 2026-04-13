@@ -59,9 +59,10 @@ func (h *PolicyHandler) HandleApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create snapshot before apply
 	current := h.engine.CurrentRules()
+	var beforeJSON []byte
 	if current != nil {
+		beforeJSON, _ = json.Marshal(current)
 		h.snapshotStore.Create("pre-apply", "Auto snapshot before policy apply", current)
 	}
 
@@ -71,9 +72,19 @@ func (h *PolicyHandler) HandleApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.engine.SetRules(compiled)
+	afterJSON, _ := json.Marshal(compiled)
 
-	// Record audit event
+	// Record audit event with full state
 	h.auditStore.Record(model.AuditEvent{
+		Action: model.AuditApply,
+		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
+		Resource: model.AuditResource{Type: "policy", Name: ps.Metadata.Name},
+		Before: beforeJSON,
+		After:  afterJSON,
+		Result: model.AuditResultSuccess,
+	})
+
+	h.engine.Broadcast(model.AuditEvent{
 		Action: model.AuditApply,
 		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
 		Result: model.AuditResultSuccess,
@@ -120,6 +131,12 @@ func (h *PolicyHandler) HandleConflicts(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
+	current := h.engine.CurrentRules()
+	var beforeJSON []byte
+	if current != nil {
+		beforeJSON, _ = json.Marshal(current)
+	}
+
 	if err := h.engine.Backend().Flush(r.Context()); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -128,6 +145,13 @@ func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
 	h.engine.SetRules(&model.CompiledRuleSet{})
 
 	h.auditStore.Record(model.AuditEvent{
+		Action: model.AuditFlush,
+		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
+		Before: beforeJSON,
+		Result: model.AuditResultSuccess,
+	})
+
+	h.engine.Broadcast(model.AuditEvent{
 		Action: model.AuditFlush,
 		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
 		Result: model.AuditResultSuccess,

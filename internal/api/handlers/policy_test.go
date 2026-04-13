@@ -18,7 +18,7 @@ import (
 
 func TestPolicyHandlers(t *testing.T) {
 	// Setup
-	tmpDir, _ := os.MkdirTemp("", "rampart-api-test-*")
+	tmpDir, _ := os.MkdirTemp("", "rampart-policy-api-test-*")
 	defer os.RemoveAll(tmpDir)
 
 	mockBE := &backend.MockBackend{}

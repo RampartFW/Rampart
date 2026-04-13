@@ -42,14 +42,14 @@ func (h *RulesHandler) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	current := h.engine.CurrentRules()
+	var beforeJSON []byte
 	var newRules []model.CompiledRule
 	if current != nil {
+		beforeJSON, _ = json.Marshal(current)
 		newRules = append(newRules, current.Rules...)
 	}
 	newRules = append(newRules, rule)
 
-	// In a real implementation, we'd need to re-sort and maybe re-apply
-	// For now, let's just update the backend if possible
 	newSet := &model.CompiledRuleSet{
 		Rules: newRules,
 	}
@@ -60,10 +60,14 @@ func (h *RulesHandler) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.engine.SetRules(newSet)
+	afterJSON, _ := json.Marshal(newSet)
 
 	h.auditStore.Record(model.AuditEvent{
-		Action: model.AuditApply, // Using AuditApply for now
+		Action: model.AuditApply,
 		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
+		Resource: model.AuditResource{Type: "rule", ID: rule.ID, Name: rule.Name},
+		Before: beforeJSON,
+		After:  afterJSON,
 		Result: model.AuditResultSuccess,
 	})
 
@@ -109,10 +113,12 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	found := false
+	var ruleName string
 	var newRules []model.CompiledRule
 	for _, rule := range current.Rules {
 		if rule.ID == id {
 			found = true
+			ruleName = rule.Name
 			continue
 		}
 		newRules = append(newRules, rule)
@@ -123,6 +129,7 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	beforeJSON, _ := json.Marshal(current)
 	newSet := &model.CompiledRuleSet{
 		Rules: newRules,
 	}
@@ -133,10 +140,14 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.engine.SetRules(newSet)
+	afterJSON, _ := json.Marshal(newSet)
 
 	h.auditStore.Record(model.AuditEvent{
 		Action: model.AuditApply,
 		Actor:  model.AuditActor{Type: "api", Identity: r.RemoteAddr},
+		Resource: model.AuditResource{Type: "rule", ID: id, Name: ruleName},
+		Before: beforeJSON,
+		After:  afterJSON,
 		Result: model.AuditResultSuccess,
 	})
 

@@ -19,7 +19,7 @@ import (
 
 func TestSnapshotHandlers(t *testing.T) {
 	// Setup
-	tmpDir, _ := os.MkdirTemp("", "rampart-snap-test-*")
+	tmpDir, _ := os.MkdirTemp("", "rampart-snapshot-api-test-*")
 	defer os.RemoveAll(tmpDir)
 
 	mockBE := &backend.MockBackend{}

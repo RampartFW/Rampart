@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/rampartfw/rampart/internal/model"
 	"gopkg.in/yaml.v3"
@@ -24,15 +25,17 @@ func resolveIncludesRecursive(ps *model.PolicySetYAML, basePath string, depth in
 	for _, inc := range ps.Includes {
 		var data []byte
 		var err error
+		var resolvedPath string
 
 		if inc.URL != "" {
 			data, err = fetchURL(inc.URL)
+			resolvedPath = basePath // Keep base for URLs
 		} else {
-			path := inc.Path
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(filepath.Dir(basePath), path)
+			resolvedPath = inc.Path
+			if !filepath.IsAbs(resolvedPath) {
+				resolvedPath = filepath.Join(filepath.Dir(basePath), resolvedPath)
 			}
-			data, err = os.ReadFile(path)
+			data, err = os.ReadFile(resolvedPath)
 		}
 
 		if err != nil {
@@ -45,7 +48,7 @@ func resolveIncludesRecursive(ps *model.PolicySetYAML, basePath string, depth in
 		}
 
 		// Recursively resolve includes for the newly included file
-		if err := resolveIncludesRecursive(&included, inc.Path, depth+1); err != nil {
+		if err := resolveIncludesRecursive(&included, resolvedPath, depth+1); err != nil {
 			return err
 		}
 
@@ -59,7 +62,8 @@ func resolveIncludesRecursive(ps *model.PolicySetYAML, basePath string, depth in
 }
 
 func fetchURL(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}

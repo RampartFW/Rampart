@@ -229,8 +229,10 @@ func (s *Store) computeHash(prevHash string, entryJSON []byte) string {
 	h.Write(entryJSON)
 	return hex.EncodeToString(h.Sum(nil))
 }
-
 func (s *Store) initLastHash() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	files, err := s.listAuditFiles()
 	if err != nil {
 		return err
@@ -241,6 +243,7 @@ func (s *Store) initLastHash() error {
 		return nil
 	}
 
+	// Latest file
 	latestFile := files[0]
 	events, err := s.readAllFromFile(latestFile)
 	if err != nil {

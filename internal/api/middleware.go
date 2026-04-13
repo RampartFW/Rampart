@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"log"
 	"net/http"
 	"strings"
@@ -68,7 +69,7 @@ func AuthMiddleware(keys []config.APIKey) Middleware {
 			token := parts[1]
 			valid := false
 			for _, k := range keys {
-				if k.Key == token {
+				if subtle.ConstantTimeCompare([]byte(k.Key), []byte(token)) == 1 {
 					valid = true
 					break
 				}

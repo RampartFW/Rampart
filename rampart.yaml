@@ -1,0 +1,21 @@
+server:
+  listen: "127.0.0.1:9443"
+
+backend:
+  type: "mock"
+
+logging:
+  level: "debug"
+  format: "text"
+
+snapshots:
+  directory: "./tmp/snapshots"
+
+audit:
+  directory: "./tmp/audit"
+
+api:
+  keys:
+    - name: "test-admin"
+      key: "rmp_test_secret_key"
+      permissions: ["*"]

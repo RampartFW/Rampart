@@ -14,6 +14,10 @@ type ExecutionPlan struct {
 	ModifyCount      int `json:"modifyCount"`
 }
 
+func (p *ExecutionPlan) IsEmpty() bool {
+	return len(p.ToAdd) == 0 && len(p.ToRemove) == 0 && len(p.ToModify) == 0
+}
+
 type RuleModification struct {
 	Before CompiledRule `json:"before"`
 	After  CompiledRule `json:"after"`

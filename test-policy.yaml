@@ -1,0 +1,31 @@
+apiVersion: rampart.dev/v1
+kind: PolicySet
+metadata:
+  name: test-web-server
+
+policies:
+  - name: web-traffic
+    defaults:
+      direction: inbound
+      action: accept
+    rules:
+      - name: allow-http
+        priority: 100
+        match:
+          protocol: tcp
+          destPorts: 80
+      
+      - name: allow-https
+        priority: 110
+        match:
+          protocol: tcp
+          destPorts: 443
+
+      - name: restrict-ssh
+        priority: 200
+        action: accept
+        match:
+          protocol: tcp
+          destPorts: 22
+          sourceCIDRs: 
+            - 192.168.1.0/24

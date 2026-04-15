@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/rampartfw/rampart/internal/config"
+	"github.com/rampartfw/rampart/internal/engine"
 )
 
 // Global flags
 var (
-	ConfigPath string
+	ConfigPath string = "rampart.yaml"
 	Output     string
 	Verbose    bool
 	NoColor    bool
@@ -71,15 +74,31 @@ type Subcommand interface {
 }
 
 // LoadConfig loads the Rampart configuration.
-func LoadConfig() interface{} {
-	// Stub until Milestone 10
-	return nil
+func LoadConfig() *config.Config {
+	cfg, err := config.LoadConfig(ConfigPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: failed to load config: %v\n", Colorize("Warning", colorYellow), err)
+		return config.DefaultConfig()
+	}
+	return cfg
 }
 
 // LoadVars loads the policy variables.
 func LoadVars() map[string]interface{} {
-	// Stub until Milestone 10
-	return nil
+	// 1. Try default location
+	vars, err := engine.ParseVariablesFile("rampart-vars.yaml")
+	if err == nil {
+		return vars
+	}
+
+	// 2. If not found, look in ~/.config/rampart/vars.yaml
+	home, _ := os.UserHomeDir()
+	vars, err = engine.ParseVariablesFile(home + "/.config/rampart/vars.yaml")
+	if err == nil {
+		return vars
+	}
+
+	return make(map[string]interface{})
 }
 
 var subcommands = []Subcommand{

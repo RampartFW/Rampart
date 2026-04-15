@@ -40,6 +40,7 @@ type PolicyYAML struct {
 
 type RuleYAML struct {
 	Name        string            `yaml:"name" json:"name"`
+	Priority    int               `yaml:"priority,omitempty" json:"priority,omitempty"`
 	Match       MatchYAML         `yaml:"match" json:"match"`
 	Action      Action            `yaml:"action" json:"action"`
 	Log         bool              `yaml:"log,omitempty" json:"log,omitempty"`

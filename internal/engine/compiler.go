@@ -93,10 +93,15 @@ func applyDefaults(ps *model.PolicySetYAML) {
 }
 
 func compileRule(r model.RuleYAML, p model.PolicyYAML, sourceFile string) (model.CompiledRule, error) {
+	priority := r.Priority
+	if priority == 0 {
+		priority = p.Priority
+	}
+
 	cr := model.CompiledRule{
 		Name:        r.Name,
 		PolicyName:  p.Name,
-		Priority:    p.Priority,
+		Priority:    priority,
 		Direction:   p.Direction,
 		Action:      r.Action,
 		Log:         r.Log,

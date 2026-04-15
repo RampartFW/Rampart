@@ -5,15 +5,18 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"text/tabwriter"
+	"time"
 
 	"github.com/rampartfw/rampart/internal/backend"
+	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/snapshot"
 )
 
 type SnapshotCommand struct{}
 
 func (c *SnapshotCommand) Name() string        { return "snapshot" }
-func (c *SnapshotCommand) Description() string { return "Manage snapshots" }
+func (c *SnapshotCommand) Description() string { return "Manage configuration snapshots" }
 
 func (c *SnapshotCommand) Run(args []string) {
 	if len(args) == 0 {
@@ -29,7 +32,7 @@ func (c *SnapshotCommand) Run(args []string) {
 		c.list(subArgs)
 	case "create":
 		c.create(subArgs)
-	case "delete":
+	case "delete", "remove":
 		c.delete(subArgs)
 	case "help", "-h", "--help":
 		c.usage()
@@ -43,47 +46,78 @@ func (c *SnapshotCommand) Run(args []string) {
 func (c *SnapshotCommand) usage() {
 	fmt.Println("Usage: rampart snapshot <subcommand> [arguments]")
 	fmt.Println("\nSubcommands:")
-	fmt.Println("  list      List all snapshots")
-	fmt.Println("  create    Create a new snapshot")
-	fmt.Println("  delete    Delete a snapshot")
+	fmt.Println("  list      List all available snapshots")
+	fmt.Println("  create    Create a new snapshot from current state")
+	fmt.Println("  delete    Remove a specific snapshot")
+}
+
+func (c *SnapshotCommand) getBackend(cfg *config.Config) (backend.Backend, error) {
+	if cfg.Backend.Type == "auto" {
+		return backend.AutoDetect()
+	}
+
+	bcfg := backend.BackendConfig{
+		Type:     cfg.Backend.Type,
+		Settings: make(map[string]string),
+	}
+	switch cfg.Backend.Type {
+	case "nftables":
+		bcfg.Settings["tableName"] = cfg.Backend.Nftables.TableName
+	case "iptables":
+		bcfg.Settings["chainPrefix"] = cfg.Backend.Iptables.ChainPrefix
+	case "aws":
+		bcfg.Settings["region"] = cfg.Backend.AWS.Region
+		bcfg.Settings["securityGroupId"] = cfg.Backend.AWS.SecurityGroupId
+	case "mock":
+		// No special settings
+	}
+	return backend.NewBackend(cfg.Backend.Type, bcfg)
 }
 
 func (c *SnapshotCommand) list(args []string) {
 	fs := flag.NewFlagSet("snapshot list", flag.ExitOnError)
-	snapDir := fs.String("dir", "snapshots", "Snapshots directory")
-	RegisterGlobalFlags(fs)
 	fs.Parse(args)
 
-	snapStore, err := snapshot.NewStore(*snapDir)
+	cfg := LoadConfig()
+	snapStore, err := snapshot.NewStore(cfg.Snapshots.Directory)
 	ExitOnError(err, "Initialize snapshot store")
+	
 	snaps, err := snapStore.List()
 	ExitOnError(err, "List snapshots")
 
-	fmt.Printf("%-24s %-20s %s\n", "ID", "Created", "Description")
-	fmt.Println("--------------------------------------------------------------------------------")
-	for _, s := range snaps {
-		fmt.Printf("%-24s %-20s %s\n", s.ID, s.CreatedAt.Format("2006-01-02 15:04:05"), s.Description)
+	if len(snaps) == 0 {
+		fmt.Println("No snapshots found.")
+		return
 	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "ID\tTRIGGER\tCREATED\tDESCRIPTION")
+	for _, s := range snaps {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", 
+			s.ID[:8], s.Trigger, s.CreatedAt.Format("2006-01-02 15:04"), s.Description)
+	}
+	w.Flush()
 }
 
 func (c *SnapshotCommand) create(args []string) {
 	fs := flag.NewFlagSet("snapshot create", flag.ExitOnError)
-	snapDir := fs.String("dir", "snapshots", "Snapshots directory")
 	desc := fs.String("desc", "Manual snapshot", "Description")
-	RegisterGlobalFlags(fs)
 	fs.Parse(args)
 
-	be, err := backend.AutoDetect()
-	ExitOnError(err, "Auto-detect backend")
+	cfg := LoadConfig()
+	be, err := c.getBackend(cfg)
+	ExitOnError(err, "Initialize backend")
+	defer be.Close()
 
-	current, err := be.CurrentState(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	current, err := be.CurrentState(ctx)
 	ExitOnError(err, "Get current state")
 
-	if _, err := os.Stat(*snapDir); os.IsNotExist(err) {
-		os.MkdirAll(*snapDir, 0755)
-	}
-	snapStore, err := snapshot.NewStore(*snapDir)
+	snapStore, err := snapshot.NewStore(cfg.Snapshots.Directory)
 	ExitOnError(err, "Initialize snapshot store")
+	
 	s, err := snapStore.Create("manual", *desc, current)
 	ExitOnError(err, "Create snapshot")
 
@@ -91,19 +125,16 @@ func (c *SnapshotCommand) create(args []string) {
 }
 
 func (c *SnapshotCommand) delete(args []string) {
-	fs := flag.NewFlagSet("snapshot delete", flag.ExitOnError)
-	snapDir := fs.String("dir", "snapshots", "Snapshots directory")
-	RegisterGlobalFlags(fs)
-	fs.Parse(args)
-
-	if len(fs.Args()) == 0 {
-		fmt.Fprintln(os.Stderr, Colorize("Error", colorRed)+": Snapshot ID is required")
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "Error: Snapshot ID is required")
 		os.Exit(1)
 	}
-	id := fs.Args()[0]
+	id := args[0]
 
-	snapStore, err := snapshot.NewStore(*snapDir)
+	cfg := LoadConfig()
+	snapStore, err := snapshot.NewStore(cfg.Snapshots.Directory)
 	ExitOnError(err, "Initialize snapshot store")
+	
 	err = snapStore.Delete(id)
 	ExitOnError(err, "Delete snapshot")
 

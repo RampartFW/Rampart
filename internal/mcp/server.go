@@ -5,18 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sync"
 
+	"github.com/rampartfw/rampart/internal/audit"
 	"github.com/rampartfw/rampart/internal/engine"
 	"github.com/rampartfw/rampart/internal/snapshot"
-	"github.com/rampartfw/rampart/internal/audit"
 )
 
 type Server struct {
 	engine        *engine.Engine
 	snapshotStore *snapshot.Store
 	auditStore    *audit.Store
-	mu            sync.Mutex
 }
 
 func NewServer(eng *engine.Engine, ss *snapshot.Store, as *audit.Store) *Server {
@@ -35,10 +33,10 @@ type Request struct {
 }
 
 type Response struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      interface{}     `json:"id"`
-	Result  interface{}     `json:"result,omitempty"`
-	Error   *RPCError       `json:"error,omitempty"`
+	JSONRPC string      `json:"jsonrpc"`
+	ID      interface{} `json:"id"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   *RPCError   `json:"error,omitempty"`
 }
 
 type RPCError struct {

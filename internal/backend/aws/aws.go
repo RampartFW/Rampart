@@ -1,10 +1,8 @@
 package aws
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -66,42 +64,6 @@ func (b *AWSBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error
 	// 2. Diff
 	// 3. Authorize/Revoke
 	return nil
-}
-
-func (b *AWSBackend) call(ctx context.Context, action string, params map[string]string) ([]byte, error) {
-	endpoint := fmt.Sprintf("https://ec2.%s.amazonaws.com/", b.region)
-	
-	// Create body
-	body := fmt.Sprintf("Action=%s&Version=2016-11-15", action)
-	for k, v := range params {
-		body += fmt.Sprintf("&%s=%s", k, v)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBufferString(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	Sign(req, []byte(body), b.accessKey, b.secretKey, b.region, "ec2", time.Now())
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AWS API error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
 }
 
 func (b *AWSBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {

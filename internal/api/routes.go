@@ -1,58 +1,62 @@
 package api
 
 import (
+	"net/http"
 	"github.com/rampartfw/rampart/internal/api/handlers"
 )
 
 func (s *Server) routes() {
-	// Standard middleware
+	// Standard middleware (apply to all)
 	s.router.Use(RequestIDMiddleware)
 	s.router.Use(LoggingMiddleware)
 	s.router.Use(CORSMiddleware)
-	s.router.Use(AuthMiddleware(s.cfg.API.Keys))
+
+	// Create an auth-wrapped handler for API routes
+	apiAuth := AuthMiddleware(s.cfg.API.Keys)
 
 	// Policy handlers
 	ph := handlers.NewPolicyHandler(s.engine, s.snapshotStore, s.auditStore)
-	s.router.Handle("POST", "/api/v1/policies/plan", ph.HandlePlan)
-	s.router.Handle("POST", "/api/v1/policies/apply", ph.HandleApply)
-	s.router.Handle("POST", "/api/v1/policies/simulate", ph.HandleSimulate)
-	s.router.Handle("GET", "/api/v1/policies/current", ph.HandleCurrent)
-	s.router.Handle("GET", "/api/v1/policies/conflicts", ph.HandleConflicts)
-	s.router.Handle("DELETE", "/api/v1/policies", ph.HandleFlush)
+	s.router.Handle("POST", "/api/v1/policies/plan", apiAuth(http.HandlerFunc(ph.HandlePlan)).ServeHTTP)
+	s.router.Handle("POST", "/api/v1/policies/apply", apiAuth(http.HandlerFunc(ph.HandleApply)).ServeHTTP)
+	s.router.Handle("POST", "/api/v1/policies/simulate", apiAuth(http.HandlerFunc(ph.HandleSimulate)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/policies/current", apiAuth(http.HandlerFunc(ph.HandleCurrent)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/policies/conflicts", apiAuth(http.HandlerFunc(ph.HandleConflicts)).ServeHTTP)
+	s.router.Handle("DELETE", "/api/v1/policies", apiAuth(http.HandlerFunc(ph.HandleFlush)).ServeHTTP)
 
 	// Rules handlers
 	rh := handlers.NewRulesHandler(s.engine, s.auditStore)
-	s.router.Handle("GET", "/api/v1/rules", rh.HandleList)
-	s.router.Handle("POST", "/api/v1/rules", rh.HandleAdd)
-	s.router.Handle("GET", "/api/v1/rules/:id", rh.HandleGet)
-	s.router.Handle("DELETE", "/api/v1/rules/:id", rh.HandleDelete)
-	s.router.Handle("GET", "/api/v1/rules/:id/stats", rh.HandleStats)
+	s.router.Handle("GET", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleList)).ServeHTTP)
+	s.router.Handle("POST", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleAdd)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/rules/:id", apiAuth(http.HandlerFunc(rh.HandleGet)).ServeHTTP)
+	s.router.Handle("DELETE", "/api/v1/rules/:id", apiAuth(http.HandlerFunc(rh.HandleDelete)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/rules/:id/stats", apiAuth(http.HandlerFunc(rh.HandleStats)).ServeHTTP)
 
 	// Snapshot handlers
 	sh := handlers.NewSnapshotHandler(s.snapshotStore, s.engine, s.auditStore)
-	s.router.Handle("GET", "/api/v1/snapshots", sh.HandleList)
-	s.router.Handle("POST", "/api/v1/snapshots", sh.HandleCreate)
-	s.router.Handle("POST", "/api/v1/snapshots/:id/rollback", sh.HandleRollback)
-	s.router.Handle("GET", "/api/v1/snapshots/:id/diff", sh.HandleDiff)
-	s.router.Handle("GET", "/api/v1/snapshots/:id/export", sh.HandleExport)
-	s.router.Handle("DELETE", "/api/v1/snapshots/:id", sh.HandleDelete)
+	s.router.Handle("GET", "/api/v1/snapshots", apiAuth(http.HandlerFunc(sh.HandleList)).ServeHTTP)
+	s.router.Handle("POST", "/api/v1/snapshots", apiAuth(http.HandlerFunc(sh.HandleCreate)).ServeHTTP)
+	s.router.Handle("POST", "/api/v1/snapshots/:id/rollback", apiAuth(http.HandlerFunc(sh.HandleRollback)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/snapshots/:id/diff", apiAuth(http.HandlerFunc(sh.HandleDiff)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/snapshots/:id/export", apiAuth(http.HandlerFunc(sh.HandleExport)).ServeHTTP)
+	s.router.Handle("DELETE", "/api/v1/snapshots/:id", apiAuth(http.HandlerFunc(sh.HandleDelete)).ServeHTTP)
 
 	// Audit handlers
 	ah := handlers.NewAuditHandler(s.auditStore)
-	s.router.Handle("GET", "/api/v1/audit", ah.HandleList)
-	s.router.Handle("GET", "/api/v1/audit/:id", ah.HandleGet)
-	s.router.Handle("GET", "/api/v1/audit/search", ah.HandleSearch)
+	s.router.Handle("GET", "/api/v1/audit", apiAuth(http.HandlerFunc(ah.HandleList)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/audit/:id", apiAuth(http.HandlerFunc(ah.HandleGet)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/audit/search", apiAuth(http.HandlerFunc(ah.HandleSearch)).ServeHTTP)
 
 	// System handlers
 	sh_sys := handlers.NewSystemHandler(s.cfg, s.engine)
-	s.router.Handle("GET", "/api/v1/system/info", sh_sys.HandleInfo)
-	s.router.Handle("GET", "/api/v1/system/health", sh_sys.HandleHealth)
-	s.router.Handle("GET", "/api/v1/system/backends", sh_sys.HandleBackends)
-	s.router.Handle("GET", "/metrics", sh_sys.HandleMetrics)
+	s.router.Handle("GET", "/api/v1/system/info", apiAuth(http.HandlerFunc(sh_sys.HandleInfo)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/system/health", apiAuth(http.HandlerFunc(sh_sys.HandleHealth)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/system/backends", apiAuth(http.HandlerFunc(sh_sys.HandleBackends)).ServeHTTP)
+	s.router.Handle("GET", "/metrics", sh_sys.HandleMetrics) // Usually internal, can be public or separate auth
 
 	// SSE
-	s.router.Handle("GET", "/api/v1/events", s.HandleSSE)
+	s.router.Handle("GET", "/api/v1/events", apiAuth(http.HandlerFunc(s.HandleSSE)).ServeHTTP)
 
-	// WebUI
+	// WebUI (No Auth)
+	s.router.Handle("GET", "/ui/", s.serveUI().ServeHTTP)
 	s.router.Handle("GET", "/ui/*", s.serveUI().ServeHTTP)
 }

@@ -1,10 +1,8 @@
 package gcp
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -13,13 +11,11 @@ import (
 )
 
 type GCPBackend struct {
-	cfg         backend.BackendConfig
-	projectID   string
-	network     string
-	keyFile     string
-	accessToken string
-	expiry      time.Time
-	client      *http.Client
+	cfg       backend.BackendConfig
+	projectID string
+	network   string
+	keyFile   string
+	client    *http.Client
 }
 
 func init() {
@@ -66,52 +62,6 @@ func (b *GCPBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error
 	// 2. Diff
 	// 3. Create/Delete rules
 	return nil
-}
-
-func (b *GCPBackend) getAccessToken() (string, error) {
-	if b.accessToken != "" && time.Now().Before(b.expiry) {
-		return b.accessToken, nil
-	}
-
-	// 1. Load service account JSON key
-	// In a real implementation, we'd parse b.keyFile.
-	// 2. Create JWT assertion
-	// 3. POST https://oauth2.googleapis.com/token
-	
-	// Simplified OAuth2 logic placeholder
-	return "placeholder-token", nil
-}
-
-func (b *GCPBackend) call(ctx context.Context, method, url string, body []byte) ([]byte, error) {
-	token, err := b.getAccessToken()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GCP API error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
 }
 
 func (b *GCPBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {

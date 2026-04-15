@@ -1,13 +1,9 @@
 package azure
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/rampartfw/rampart/internal/backend"
@@ -74,83 +70,6 @@ func (b *AzureBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) err
 	// 2. Diff
 	// 3. Create/Delete rules
 	return nil
-}
-
-func (b *AzureBackend) getAccessToken(ctx context.Context) (string, error) {
-	if b.accessToken != "" && time.Now().Before(b.expiry) {
-		return b.accessToken, nil
-	}
-
-	authURL := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/token", b.tenantID)
-	data := url.Values{}
-	data.Set("grant_type", "client_credentials")
-	data.Set("client_id", b.clientID)
-	data.Set("client_secret", b.clientSecret)
-	data.Set("resource", "https://management.azure.com/")
-
-	req, err := http.NewRequestWithContext(ctx, "POST", authURL, bytes.NewBufferString(data.Encode()))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("Azure OAuth2 error (%d): %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   string `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-
-	b.accessToken = result.AccessToken
-	b.expiry = time.Now().Add(50 * time.Minute) // Placeholder expiry
-	return b.accessToken, nil
-}
-
-func (b *AzureBackend) call(ctx context.Context, method, relativeURL string, body []byte) ([]byte, error) {
-	token, err := b.getAccessToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	baseURL := "https://management.azure.com"
-	fullURL := baseURL + relativeURL
-
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("Azure API error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
 }
 
 func (b *AzureBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet) (*model.ExecutionPlan, error) {

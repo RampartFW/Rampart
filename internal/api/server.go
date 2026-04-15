@@ -174,6 +174,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveUI() http.Handler {
+	// ui/dist contains the build output
 	distFS, err := fs.Sub(uiFS, "ui/dist")
 	if err != nil {
 		panic(err)
@@ -181,22 +182,32 @@ func (s *Server) serveUI() http.Handler {
 	fileServer := http.FileServer(http.FS(distFS))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Strip /ui prefix
-		path := strings.TrimPrefix(r.URL.Path, "/ui")
-		if path == "" {
-			path = "/"
-		}
-
-		// Check if file exists in FS
-		f, err := distFS.Open(strings.TrimPrefix(path, "/"))
-		if err == nil {
-			f.Close()
-			http.StripPrefix("/ui", fileServer).ServeHTTP(w, r)
+		// 1. Get the path relative to /ui/
+		path := r.URL.Path
+		if !strings.HasPrefix(path, "/ui/") && path != "/ui" {
+			http.NotFound(w, r)
 			return
 		}
 
-		// Fallback to index.html for SPA
-		r.URL.Path = "/"
+		// 2. Clean the path to get the relative file path
+		relPath := strings.TrimPrefix(path, "/ui/")
+		if relPath == "/ui" || relPath == "" {
+			relPath = "index.html"
+		}
+
+		// 3. Check if the requested file exists in the embedded FS
+		f, err := distFS.Open(relPath)
+		if err != nil {
+			// If file doesn't exist, it might be a React Router path - serve index.html
+			r.URL.Path = "/" // For http.FileServer to serve index.html from root of distFS
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		f.Close()
+
+		// 4. Serve the actual file
+		// We need to set r.URL.Path to relPath so fileServer finds it at the root of distFS
+		r.URL.Path = "/" + relPath
 		fileServer.ServeHTTP(w, r)
 	})
 }

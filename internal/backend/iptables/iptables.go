@@ -51,7 +51,8 @@ func (b *IptablesBackend) Probe() error {
 	}
 	_, err = exec.LookPath("ip6tables")
 	if err != nil {
-		// IPv6 is optional but good to have
+		// IPv6 is optional; we continue without it if the binary is missing.
+		return nil 
 	}
 	return nil
 }

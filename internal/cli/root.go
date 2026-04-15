@@ -116,22 +116,29 @@ func usage() {
 }
 
 func Execute() {
-	if len(os.Args) < 2 {
+	// 1. Setup global flags on the default flagset
+	RegisterGlobalFlags(flag.CommandLine)
+	flag.Usage = usage
+	flag.Parse()
+
+	// 2. Check for command
+	args := flag.Args()
+	if len(args) < 1 {
 		usage()
 		os.Exit(1)
 	}
 
-	commandName := os.Args[1]
-	args := os.Args[2:]
+	commandName := args[0]
+	commandArgs := args[1:]
 
-	if commandName == "help" || commandName == "-h" || commandName == "--help" {
+	if commandName == "help" {
 		usage()
 		os.Exit(0)
 	}
 
 	for _, cmd := range subcommands {
 		if cmd.Name() == commandName {
-			cmd.Run(args)
+			cmd.Run(commandArgs)
 			return
 		}
 	}

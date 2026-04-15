@@ -177,22 +177,6 @@ func statesOverlap(a, b []model.ConnState) bool {
 	return false
 }
 
-func cidrsOverlap(a, b []net.IPNet) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return true
-	}
-	for _, n1 := range a {
-		for _, n2 := range b {
-			start1, end1 := cidrToInterval(n1)
-			start2, end2 := cidrToInterval(n2)
-			if start1.Cmp(end2) <= 0 && start2.Cmp(end1) <= 0 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func cidrsOverlapCached(a, b []model.IPInterval) bool {
 	if len(a) == 0 || len(b) == 0 {
 		return true

@@ -82,11 +82,8 @@ func ruleToArgs(rule model.CompiledRule, chain string) []string {
 
 	// Logging
 	if rule.Log {
-		// In iptables, LOG is a target, so we'd need a separate rule or a jump to a logging chain.
-		// However, the standard way to do LOG + ACCEPT is two rules.
-		// For simplicity in this compiler, we'll just handle the main action target.
-		// If logging is enabled, we might need to handle it elsewhere or return multiple argument sets.
-		// Let's assume for now this function returns args for the primary action.
+		// TODO: Implement dual-rule generation for LOG + ACTION in iptables.
+		// For now, we only handle the primary action to avoid complex rule splitting here.
 	}
 
 	// Comment for identification

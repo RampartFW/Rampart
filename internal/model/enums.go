@@ -62,6 +62,40 @@ func (p Protocol) MarshalJSON() ([]byte, error)  { return json.Marshal(string(p)
 func (c ConnState) MarshalJSON() ([]byte, error) { return json.Marshal(string(c)) }
 func (i IPVersion) MarshalJSON() ([]byte, error) { return json.Marshal(string(i)) }
 
+func ActionFromString(s string) Action {
+	switch strings.ToLower(s) {
+	case "accept":
+		return ActionAccept
+	case "drop":
+		return ActionDrop
+	case "reject":
+		return ActionReject
+	case "log":
+		return ActionLog
+	case "rate-limit":
+		return ActionRateLimit
+	default:
+		return ActionAccept
+	}
+}
+
+func ProtocolFromString(s string) Protocol {
+	switch strings.ToLower(s) {
+	case "tcp":
+		return ProtocolTCP
+	case "udp":
+		return ProtocolUDP
+	case "icmp":
+		return ProtocolICMP
+	case "icmpv6":
+		return ProtocolICMPv6
+	case "any":
+		return ProtocolAny
+	default:
+		return ProtocolAny
+	}
+}
+
 func (d *Direction) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {

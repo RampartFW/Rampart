@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -130,7 +131,111 @@ func (b *NFTablesBackend) parseNftRule(r nftRule) model.CompiledRule {
 	case "output":
 		rule.Direction = model.DirectionOutbound
 	}
+
+	for _, rawExpr := range r.Rule.Expr {
+		var expr map[string]interface{}
+		if err := json.Unmarshal(rawExpr, &expr); err != nil {
+			continue
+		}
+
+		// Handle payload (IP addresses, ports)
+		if payload, ok := expr["payload"].(map[string]interface{}); ok {
+			field, _ := payload["field"].(string)
+			base, _ := payload["base"].(string)
+			
+			// We'll need a way to correlate these with subsequent 'cmp' or 'lookup' expressions
+			// For now, this is a simplified parser.
+			_ = field
+			_ = base
+		}
+
+		// Handle match (the actual values)
+		if match, ok := expr["match"].(map[string]interface{}); ok {
+			left, _ := match["left"].(map[string]interface{})
+			right := match["right"]
+			op, _ := match["op"].(string)
+
+			if op == "==" || op == "in" {
+				b.applyMatchToRule(&rule, left, right)
+			}
+		}
+
+		// Handle immediate/action (accept, drop, etc)
+		if immediate, ok := expr["accept"]; ok {
+			_ = immediate
+			rule.Action = model.ActionAccept
+		} else if _, ok := expr["drop"]; ok {
+			rule.Action = model.ActionDrop
+		} else if _, ok := expr["reject"]; ok {
+			rule.Action = model.ActionReject
+		}
+
+		// Handle logging
+		if _, ok := expr["log"]; ok {
+			rule.Log = true
+		}
+
+		// Handle counter
+		if _, ok := expr["counter"]; ok {
+			// Rule has a counter
+		}
+	}
+
 	return rule
+}
+
+func (b *NFTablesBackend) applyMatchToRule(rule *model.CompiledRule, left map[string]interface{}, right interface{}) {
+	payload, _ := left["payload"].(map[string]interface{})
+	field, _ := payload["field"].(string)
+
+	switch field {
+	case "saddr":
+		if s, ok := right.(string); ok {
+			_, n, _ := net.ParseCIDR(s)
+			if n == nil {
+				ip := net.ParseIP(s)
+				if ip != nil {
+					mask := net.CIDRMask(32, 32)
+					if ip.To4() == nil {
+						mask = net.CIDRMask(128, 128)
+					}
+					n = &net.IPNet{IP: ip, Mask: mask}
+				}
+			}
+			if n != nil {
+				rule.Match.SourceNets = append(rule.Match.SourceNets, *n)
+			}
+		}
+	case "daddr":
+		if s, ok := right.(string); ok {
+			_, n, _ := net.ParseCIDR(s)
+			if n == nil {
+				ip := net.ParseIP(s)
+				if ip != nil {
+					mask := net.CIDRMask(32, 32)
+					if ip.To4() == nil {
+						mask = net.CIDRMask(128, 128)
+					}
+					n = &net.IPNet{IP: ip, Mask: mask}
+				}
+			}
+			if n != nil {
+				rule.Match.DestNets = append(rule.Match.DestNets, *n)
+			}
+		}
+	case "protocol":
+		if s, ok := right.(string); ok {
+			rule.Match.Protocols = append(rule.Match.Protocols, model.ProtocolFromString(s))
+		}
+	case "dport":
+		if f, ok := right.(float64); ok {
+			rule.Match.DestPorts = append(rule.Match.DestPorts, model.PortRange{Start: uint16(f), End: uint16(f)})
+		}
+	case "sport":
+		if f, ok := right.(float64); ok {
+			rule.Match.SourcePorts = append(rule.Match.SourcePorts, model.PortRange{Start: uint16(f), End: uint16(f)})
+		}
+	}
 }
 
 func (b *NFTablesBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {

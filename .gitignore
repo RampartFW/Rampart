@@ -1,0 +1,60 @@
+# Binaries
+rampart
+rampart.exe
+rampart.exe~
+*.exe
+*.snap
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+audit/
+
+# Environment / local config
+.env
+.env.*
+!.env.example
+rampart-test.yaml
+
+# Go
+bin/
+dist/
+build/
+vendor/
+coverage
+coverage.*
+cover.out
+*.coverprofile
+*.prof
+*.test
+*.out
+
+# Workspace / Temporary files
+.cache/
+.tmp/
+tmp/
+internal/backend/mock_state/
+
+# Frontend (React/Vite)
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/.vite/
+ui/.cache/
+ui/coverage/
+ui/*.tsbuildinfo
+dist-ui/
+
+# Systemd / Service
+*.service
+!rampart.service

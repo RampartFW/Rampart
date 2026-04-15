@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 	"time"
@@ -48,11 +49,6 @@ func (b *IptablesBackend) Probe() error {
 	_, err := exec.LookPath("iptables")
 	if err != nil {
 		return fmt.Errorf("iptables binary not found: %w", err)
-	}
-	_, err = exec.LookPath("ip6tables")
-	if err != nil {
-		// IPv6 is optional; we continue without it if the binary is missing.
-		return nil 
 	}
 	return nil
 }
@@ -103,8 +99,6 @@ func (b *IptablesBackend) parseIptablesSave(data []byte) ([]model.CompiledRule, 
 			continue
 		}
 
-		// Very basic parsing for now. 
-		// In a real implementation, this would be more robust.
 		rule := b.parseRuleLine(line)
 		rules = append(rules, rule)
 	}
@@ -117,7 +111,8 @@ func (b *IptablesBackend) parseRuleLine(line string) model.CompiledRule {
 	rule := model.CompiledRule{}
 
 	for i := 0; i < len(parts); i++ {
-		switch parts[i] {
+		p := parts[i]
+		switch p {
 		case "-A":
 			if i+1 < len(parts) {
 				chain := parts[i+1]
@@ -129,12 +124,82 @@ func (b *IptablesBackend) parseRuleLine(line string) model.CompiledRule {
 					rule.Direction = model.DirectionOutbound
 				}
 			}
-		case "--comment":
+		case "-p":
 			if i+1 < len(parts) {
-				comment := strings.Trim(parts[i+1], "\"")
-				if strings.HasPrefix(comment, "rampart:") {
-					rule.Name = strings.TrimPrefix(comment, "rampart:")
+				rule.Match.Protocols = append(rule.Match.Protocols, model.ProtocolFromString(parts[i+1]))
+			}
+		case "-s":
+			if i+1 < len(parts) {
+				_, n, _ := net.ParseCIDR(parts[i+1])
+				if n == nil {
+					ip := net.ParseIP(parts[i+1])
+					if ip != nil {
+						mask := net.CIDRMask(32, 32)
+						if ip.To4() == nil {
+							mask = net.CIDRMask(128, 128)
+						}
+						n = &net.IPNet{IP: ip, Mask: mask}
+					}
 				}
+				if n != nil {
+					rule.Match.SourceNets = append(rule.Match.SourceNets, *n)
+				}
+			}
+		case "-d":
+			if i+1 < len(parts) {
+				_, n, _ := net.ParseCIDR(parts[i+1])
+				if n == nil {
+					ip := net.ParseIP(parts[i+1])
+					if ip != nil {
+						mask := net.CIDRMask(32, 32)
+						if ip.To4() == nil {
+							mask = net.CIDRMask(128, 128)
+						}
+						n = &net.IPNet{IP: ip, Mask: mask}
+					}
+				}
+				if n != nil {
+					rule.Match.DestNets = append(rule.Match.DestNets, *n)
+				}
+			}
+		case "--dport":
+			if i+1 < len(parts) {
+				p := parts[i+1]
+				if strings.Contains(p, ":") {
+					var start, end uint16
+					fmt.Sscanf(p, "%d:%d", &start, &end)
+					rule.Match.DestPorts = append(rule.Match.DestPorts, model.PortRange{Start: start, End: end})
+				} else {
+					var port uint16
+					fmt.Sscanf(p, "%d", &port)
+					rule.Match.DestPorts = append(rule.Match.DestPorts, model.PortRange{Start: port, End: port})
+				}
+			}
+		case "--sport":
+			if i+1 < len(parts) {
+				p := parts[i+1]
+				if strings.Contains(p, ":") {
+					var start, end uint16
+					fmt.Sscanf(p, "%d:%d", &start, &end)
+					rule.Match.SourcePorts = append(rule.Match.SourcePorts, model.PortRange{Start: start, End: end})
+				} else {
+					var port uint16
+					fmt.Sscanf(p, "%d", &port)
+					rule.Match.SourcePorts = append(rule.Match.SourcePorts, model.PortRange{Start: port, End: port})
+				}
+			}
+		case "-m":
+			if i+1 < len(parts) && parts[i+1] == "comment" {
+				if i+3 < len(parts) && parts[i+2] == "--comment" {
+					comment := strings.Trim(parts[i+3], "\"")
+					if strings.HasPrefix(comment, "rampart:") {
+						rule.Name = strings.TrimPrefix(comment, "rampart:")
+					}
+				}
+			}
+		case "-j":
+			if i+1 < len(parts) {
+				rule.Action = model.ActionFromString(parts[i+1])
 			}
 		}
 	}
@@ -145,111 +210,84 @@ func (b *IptablesBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) 
 	// Chain Swap Strategy
 	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
 
-	// 1. Create NEW chains
-	for _, chain := range chains {
-		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
-		b.exec(ctx, "iptables", "-N", newChain)
-		b.exec(ctx, "ip6tables", "-N", newChain)
-	}
-
-	// 2. Populate NEW chains
-	for _, rule := range rs.Rules {
-		cmd := "iptables"
-		if rule.Match.IPVersion == model.IPv6 {
-			cmd = "ip6tables"
+	for _, ipt := range []string{"iptables", "ip6tables"} {
+		if _, err := exec.LookPath(ipt); err != nil {
+			continue
 		}
-		
-		chain := b.directionToChain(rule.Direction) + "-NEW"
-		args := ruleToArgs(rule, chain)
-		if err := b.exec(ctx, cmd, args...); err != nil {
-			b.cleanupNewChains(ctx)
-			return fmt.Errorf("failed to add rule %s: %w", rule.Name, err)
+
+		for _, chain := range chains {
+			rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
+			newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
+
+			// 1. Create NEW chain
+			_ = b.exec(ctx, ipt, "-N", newChain)
+			_ = b.exec(ctx, ipt, "-F", newChain)
+
+			// 2. Populate NEW chain
+			for _, rule := range rs.Rules {
+				if !b.shouldApplyRule(rule, chain, ipt == "ip6tables") {
+					continue
+				}
+				args := ruleToArgs(rule, newChain)
+				if err := b.exec(ctx, ipt, append([]string{"-A"}, args...)...); err != nil {
+					return fmt.Errorf("failed to add rule %s to %s: %w", rule.Name, newChain, err)
+				}
+			}
+
+			// 3. Ensure rampart chain exists
+			_ = b.exec(ctx, ipt, "-N", rampartChain)
+
+			// 4. Atomic-ish swap using temporary jump
+			// a. Insert jump to NEW at top of base chain
+			_ = b.exec(ctx, ipt, "-I", chain, "1", "-j", newChain)
+			// b. Delete jump to OLD from base chain
+			_ = b.exec(ctx, ipt, "-D", chain, "-j", rampartChain)
+			// c. Flush and delete OLD
+			_ = b.exec(ctx, ipt, "-F", rampartChain)
+			_ = b.exec(ctx, ipt, "-X", rampartChain)
+			// d. Rename NEW to OLD
+			if err := b.exec(ctx, ipt, "-E", newChain, rampartChain); err != nil {
+				return fmt.Errorf("failed to rename chain %s to %s: %w", newChain, rampartChain, err)
+			}
+			// e. Re-add jump to rampartChain (now contains new rules)
+			_ = b.exec(ctx, ipt, "-I", chain, "1", "-j", rampartChain)
+			// f. Remove temporary jump to newChain (which no longer exists)
+			_ = b.exec(ctx, ipt, "-D", chain, "-j", newChain)
 		}
-	}
-
-	// 3. Swap: update jump targets in base chains
-	for _, chain := range chains {
-		rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
-		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
-
-		// Create rampart chain if it doesn't exist
-		b.exec(ctx, "iptables", "-N", rampartChain)
-		b.exec(ctx, "ip6tables", "-N", rampartChain)
-
-		// Ensure jumps from base chains (INPUT/FORWARD/OUTPUT) to our RAMPART chains
-		// This part is tricky as it affects traffic.
-		// Usually we'd want to have a permanent jump to RAMPART-INPUT at the top of INPUT.
-		b.ensureJump(ctx, chain, rampartChain)
-
-		// Now swap rules from rampartChain to newChain content
-		// Efficient swap:
-		// 1. Flush rampartChain
-		// 2. Append all rules from newChain to rampartChain
-		// Or better: 
-		// 1. Jump from base to NEW
-		// 2. Delete jump from base to OLD
-		// 3. Rename/Swap.
-		
-		// Let's do the strategy from §8.1 of IMPLEMENTATION.md
-		b.exec(ctx, "iptables", "-I", chain, "1", "-j", newChain)
-		b.exec(ctx, "iptables", "-D", chain, "-j", rampartChain)
-		b.exec(ctx, "iptables", "-F", rampartChain)
-		b.exec(ctx, "iptables", "-X", rampartChain)
-		b.exec(ctx, "iptables", "-E", newChain, rampartChain)
-		
-		// Same for IPv6
-		b.exec(ctx, "ip6tables", "-I", chain, "1", "-j", newChain)
-		b.exec(ctx, "ip6tables", "-D", chain, "-j", rampartChain)
-		b.exec(ctx, "ip6tables", "-F", rampartChain)
-		b.exec(ctx, "ip6tables", "-X", rampartChain)
-		b.exec(ctx, "ip6tables", "-E", newChain, rampartChain)
 	}
 
 	return nil
 }
 
-func (b *IptablesBackend) directionToChain(d model.Direction) string {
-	switch d {
-	case model.DirectionInbound:
-		return b.chainPrefix + "-INPUT"
-	case model.DirectionForward:
-		return b.chainPrefix + "-FORWARD"
-	case model.DirectionOutbound:
-		return b.chainPrefix + "-OUTPUT"
-	default:
-		return b.chainPrefix + "-INPUT"
+func (b *IptablesBackend) shouldApplyRule(rule model.CompiledRule, chain string, isIPv6 bool) bool {
+	// Direction check
+	switch chain {
+	case "INPUT":
+		if rule.Direction != model.DirectionInbound { return false }
+	case "FORWARD":
+		if rule.Direction != model.DirectionForward { return false }
+	case "OUTPUT":
+		if rule.Direction != model.DirectionOutbound { return false }
 	}
-}
 
-func (b *IptablesBackend) ensureJump(ctx context.Context, base, target string) {
-	// Check if jump exists
-	if !b.jumpExists(ctx, base, target) {
-		b.exec(ctx, "iptables", "-I", base, "1", "-j", target)
+	// IP Version check
+	hasIPv4 := false
+	hasIPv6 := false
+	
+	if len(rule.Match.SourceNets) == 0 && len(rule.Match.DestNets) == 0 {
+		return true
 	}
-	if !b.jumpExists6(ctx, base, target) {
-		b.exec(ctx, "ip6tables", "-I", base, "1", "-j", target)
+
+	for _, n := range append(rule.Match.SourceNets, rule.Match.DestNets...) {
+		if n.IP.To4() != nil {
+			hasIPv4 = true
+		} else {
+			hasIPv6 = true
+		}
 	}
-}
 
-func (b *IptablesBackend) jumpExists(ctx context.Context, base, target string) bool {
-	output, _ := exec.CommandContext(ctx, "iptables", "-S", base).Output()
-	return strings.Contains(string(output), "-j "+target)
-}
-
-func (b *IptablesBackend) jumpExists6(ctx context.Context, base, target string) bool {
-	output, _ := exec.CommandContext(ctx, "ip6tables", "-S", base).Output()
-	return strings.Contains(string(output), "-j "+target)
-}
-
-func (b *IptablesBackend) cleanupNewChains(ctx context.Context) {
-	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
-	for _, chain := range chains {
-		newChain := fmt.Sprintf("%s-%s-NEW", b.chainPrefix, chain)
-		b.exec(ctx, "iptables", "-F", newChain)
-		b.exec(ctx, "iptables", "-X", newChain)
-		b.exec(ctx, "ip6tables", "-F", newChain)
-		b.exec(ctx, "ip6tables", "-X", newChain)
-	}
+	if isIPv6 { return hasIPv6 }
+	return hasIPv4
 }
 
 func (b *IptablesBackend) exec(ctx context.Context, cmd string, args ...string) error {
@@ -262,7 +300,6 @@ func (b *IptablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet)
 	if err != nil {
 		return nil, err
 	}
-	// For now, simple plan
 	return &model.ExecutionPlan{
 		CurrentRuleCount: len(current.Rules),
 		PlannedRuleCount: len(rs.Rules),
@@ -270,67 +307,40 @@ func (b *IptablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet)
 }
 
 func (b *IptablesBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
-	// Reconstruct state and apply
 	return fmt.Errorf("rollback not fully implemented")
 }
 
 func (b *IptablesBackend) Flush(ctx context.Context) error {
 	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
-	for _, chain := range chains {
-		rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
-		b.exec(ctx, "iptables", "-D", chain, "-j", rampartChain)
-		b.exec(ctx, "iptables", "-F", rampartChain)
-		b.exec(ctx, "iptables", "-X", rampartChain)
-		
-		b.exec(ctx, "ip6tables", "-D", chain, "-j", rampartChain)
-		b.exec(ctx, "ip6tables", "-F", rampartChain)
-		b.exec(ctx, "ip6tables", "-X", rampartChain)
+	for _, ipt := range []string{"iptables", "ip6tables"} {
+		if _, err := exec.LookPath(ipt); err != nil {
+			continue
+		}
+		for _, chain := range chains {
+			rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
+			_ = b.exec(ctx, ipt, "-D", chain, "-j", rampartChain)
+			_ = b.exec(ctx, ipt, "-F", rampartChain)
+			_ = b.exec(ctx, ipt, "-X", rampartChain)
+		}
 	}
 	return nil
 }
 
 func (b *IptablesBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
 	stats := make(map[string]model.RuleStats)
-
-	// Get stats for IPv4
-	ipv4Stats, err := b.getStats(ctx, "iptables")
-	if err == nil {
-		for k, v := range ipv4Stats {
-			stats[k] = v
+	for _, ipt := range []string{"iptables", "ip6tables"} {
+		if _, err := exec.LookPath(ipt); err != nil {
+			continue
+		}
+		for _, chain := range []string{"INPUT", "FORWARD", "OUTPUT"} {
+			rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
+			cmd := exec.CommandContext(ctx, ipt, "-L", rampartChain, "-v", "-n", "-x")
+			output, err := cmd.Output()
+			if err == nil {
+				b.parseStatsOutput(output, stats)
+			}
 		}
 	}
-
-	// Get stats for IPv6
-	ipv6Stats, err := b.getStats(ctx, "ip6tables")
-	if err == nil {
-		for k, v := range ipv6Stats {
-			stats[k] = v
-		}
-	}
-
-	return stats, nil
-}
-
-func (b *IptablesBackend) getStats(ctx context.Context, command string) (map[string]model.RuleStats, error) {
-	_, err := exec.LookPath(command)
-	if err != nil {
-		return nil, nil
-	}
-
-	stats := make(map[string]model.RuleStats)
-	chains := []string{"INPUT", "FORWARD", "OUTPUT"}
-
-	for _, chain := range chains {
-		rampartChain := fmt.Sprintf("%s-%s", b.chainPrefix, chain)
-		cmd := exec.CommandContext(ctx, command, "-L", rampartChain, "-v", "-n", "-x")
-		output, err := cmd.Output()
-		if err != nil {
-			continue // Chain might not exist
-		}
-
-		b.parseStatsOutput(output, stats)
-	}
-
 	return stats, nil
 }
 
@@ -347,31 +357,19 @@ func (b *IptablesBackend) parseStatsOutput(output []byte, stats map[string]model
 			continue
 		}
 
-		// iptables -L -v -n output format:
-		// pkts bytes target prot opt in out source destination
-		pkts := fields[0]
-		bytesStr := fields[1]
+		var pkts, bytesVal uint64
+		fmt.Sscanf(fields[0], "%d", &pkts)
+		fmt.Sscanf(fields[1], "%d", &bytesVal)
 
-		// Extract rule name from comment
-		var ruleName string
-		for i, field := range fields {
-			if field == "/*" && i+1 < len(fields) {
-				comment := fields[i+1]
-				if strings.HasPrefix(comment, "rampart:") {
-					ruleName = strings.TrimPrefix(comment, "rampart:")
-					break
-				}
-			}
-		}
-
-		if ruleName != "" {
-			var p, by uint64
-			fmt.Sscanf(pkts, "%d", &p)
-			fmt.Sscanf(bytesStr, "%d", &by)
-			stats[ruleName] = model.RuleStats{
-				RuleID:  ruleName,
-				Packets: p,
-				Bytes:   by,
+		for _, field := range fields {
+			if strings.HasPrefix(field, "rampart:") {
+				ruleName := strings.TrimPrefix(field, "rampart:")
+				s := stats[ruleName]
+				s.RuleID = ruleName
+				s.Packets += pkts
+				s.Bytes += bytesVal
+				stats[ruleName] = s
+				break
 			}
 		}
 	}

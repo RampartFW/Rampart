@@ -49,6 +49,11 @@ func (s *Store) Create(trigger, description string, state *model.CompiledRuleSet
 		return nil, fmt.Errorf("failed to encode ruleset: %w", err)
 	}
 
+	// Critical for production: sync to disk
+	if err := f.Sync(); err != nil {
+		return nil, fmt.Errorf("failed to sync snapshot to disk: %w", err)
+	}
+
 	fi, err := f.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat snapshot file: %w", err)

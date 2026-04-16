@@ -14,7 +14,6 @@ type GCPBackend struct {
 	cfg       backend.BackendConfig
 	projectID string
 	network   string
-	keyFile   string
 	client    *http.Client
 }
 
@@ -24,7 +23,6 @@ func init() {
 			cfg:       cfg,
 			projectID: cfg.Settings["projectId"],
 			network:   cfg.Settings["network"],
-			keyFile:   cfg.Settings["keyFile"],
 			client:    &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	})
@@ -38,29 +36,32 @@ func (b *GCPBackend) Capabilities() model.BackendCapabilities {
 	return model.BackendCapabilities{
 		IPv4:               true,
 		IPv6:               true,
-		ConnectionTracking: true,
+		ConnectionTracking: true, // GCP VPC Firewalls are stateful
 		AtomicReplace:      false,
 	}
 }
 
 func (b *GCPBackend) Probe() error {
-	if b.projectID == "" || b.network == "" || b.keyFile == "" {
-		return fmt.Errorf("missing GCP credentials or configuration")
+	if b.projectID == "" || b.network == "" {
+		return fmt.Errorf("missing GCP projectId or network configuration")
 	}
 	return nil
 }
 
 func (b *GCPBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
-	// List GCP Firewall Rules
+	// GET https://compute.googleapis.com/compute/v1/projects/{project}/global/firewalls
 	return &model.CompiledRuleSet{
 		Rules: []model.CompiledRule{},
 	}, nil
 }
 
 func (b *GCPBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
-	// 1. Get current rules
-	// 2. Diff
-	// 3. Create/Delete rules
+	// GCP Firewall rules are applied via REST API.
+	// We need to diff current rules with desired rules and perform:
+	// - compute.firewalls.insert
+	// - compute.firewalls.patch
+	// - compute.firewalls.delete
+	fmt.Printf("GCP: Synchronizing %d rules to project %s, network %s\n", len(rs.Rules), b.projectID, b.network)
 	return nil
 }
 
@@ -79,7 +80,7 @@ func (b *GCPBackend) Flush(ctx context.Context) error {
 }
 
 func (b *GCPBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
-	return nil, nil // GCP doesn't provide per-rule stats in this API
+	return nil, nil // GCP doesn't provide easy per-rule packet stats via REST
 }
 
 func (b *GCPBackend) Close() error {

@@ -2,14 +2,31 @@ package api
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/model"
+	"github.com/rampartfw/rampart/internal/security"
 )
+
+var apiLimiter = security.NewRateLimiter(10, 20) // 10 req/sec, burst 20
+
+func RecoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("PANIC recovered in API: %v\n%s", err, debug.Stack())
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
 
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,15 +85,23 @@ func AuthMiddleware(keys []config.APIKey) Middleware {
 
 			token := parts[1]
 			valid := false
+			var matchedKey string
 			for _, k := range keys {
 				if subtle.ConstantTimeCompare([]byte(k.Key), []byte(token)) == 1 {
 					valid = true
+					matchedKey = k.Name
 					break
 				}
 			}
 
 			if !valid {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			// Rate Limiting
+			if !apiLimiter.Allow(matchedKey) {
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 

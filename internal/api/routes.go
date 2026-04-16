@@ -7,6 +7,7 @@ import (
 
 func (s *Server) routes() {
 	// Standard middleware (apply to all)
+	s.router.Use(RecoveryMiddleware)
 	s.router.Use(RequestIDMiddleware)
 	s.router.Use(LoggingMiddleware)
 	s.router.Use(CORSMiddleware)
@@ -15,7 +16,7 @@ func (s *Server) routes() {
 	apiAuth := AuthMiddleware(s.cfg.API.Keys)
 
 	// Policy handlers
-	ph := handlers.NewPolicyHandler(s.engine, s.snapshotStore, s.auditStore)
+	ph := handlers.NewPolicyHandler(s.engine, s.snapshotStore, s.auditStore, s.raftNode)
 	s.router.Handle("POST", "/api/v1/policies/plan", apiAuth(http.HandlerFunc(ph.HandlePlan)).ServeHTTP)
 	s.router.Handle("POST", "/api/v1/policies/apply", apiAuth(http.HandlerFunc(ph.HandleApply)).ServeHTTP)
 	s.router.Handle("POST", "/api/v1/policies/simulate", apiAuth(http.HandlerFunc(ph.HandleSimulate)).ServeHTTP)
@@ -24,6 +25,8 @@ func (s *Server) routes() {
 	s.router.Handle("DELETE", "/api/v1/policies", apiAuth(http.HandlerFunc(ph.HandleFlush)).ServeHTTP)
 
 	// Rules handlers
+	// Note: RulesHandler might also need RaftNode if we want quick-add rules to be replicated.
+	// For now, only PolicySet updates are replicated.
 	rh := handlers.NewRulesHandler(s.engine, s.auditStore)
 	s.router.Handle("GET", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleList)).ServeHTTP)
 	s.router.Handle("POST", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleAdd)).ServeHTTP)
@@ -47,10 +50,11 @@ func (s *Server) routes() {
 	s.router.Handle("GET", "/api/v1/audit/search", apiAuth(http.HandlerFunc(ah.HandleSearch)).ServeHTTP)
 
 	// System handlers
-	sh_sys := handlers.NewSystemHandler(s.cfg, s.engine)
+	sh_sys := handlers.NewSystemHandler(s.cfg, s.engine, s.raftNode)
 	s.router.Handle("GET", "/api/v1/system/info", apiAuth(http.HandlerFunc(sh_sys.HandleInfo)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/system/health", apiAuth(http.HandlerFunc(sh_sys.HandleHealth)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/system/backends", apiAuth(http.HandlerFunc(sh_sys.HandleBackends)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/cluster/status", apiAuth(http.HandlerFunc(sh_sys.HandleClusterStatus)).ServeHTTP)
 	s.router.Handle("GET", "/metrics", sh_sys.HandleMetrics) // Usually internal, can be public or separate auth
 
 	// SSE

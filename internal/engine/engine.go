@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"sync"
+	"time"
 	"github.com/rampartfw/rampart/internal/backend"
 	"github.com/rampartfw/rampart/internal/model"
 )
@@ -38,7 +39,7 @@ func (e *Engine) SetRules(rs *model.CompiledRuleSet) {
 	e.mu.Unlock()
 }
 
-// ReapplyRules reapplies the current ruleset to the backend.
+// ReapplyRules reapplies the current ruleset to the backend, filtering for active ones.
 func (e *Engine) ReapplyRules(ctx context.Context) error {
 	e.mu.RLock()
 	rs := e.currentRules
@@ -48,7 +49,24 @@ func (e *Engine) ReapplyRules(ctx context.Context) error {
 		return nil
 	}
 
-	return e.backend.Apply(ctx, rs)
+	// Filter rules based on current schedule
+	now := time.Now()
+	var activeRules []model.CompiledRule
+	for _, rule := range rs.Rules {
+		if IsActive(rule.Schedule, now) {
+			activeRules = append(activeRules, rule)
+		}
+	}
+
+	// Create a new temporary ruleset for applying
+	activeRS := &model.CompiledRuleSet{
+		Rules:      activeRules,
+		Hash:       rs.Hash, // Keep original hash for tracking
+		Metadata:   rs.Metadata,
+		CompiledAt: rs.CompiledAt,
+	}
+
+	return e.backend.Apply(ctx, activeRS)
 }
 
 // Backend returns the engine's backend.

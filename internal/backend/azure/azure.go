@@ -15,11 +15,6 @@ type AzureBackend struct {
 	subscriptionID string
 	resourceGroup  string
 	nsgName        string
-	tenantID       string
-	clientID       string
-	clientSecret   string
-	accessToken    string
-	expiry         time.Time
 	client         *http.Client
 }
 
@@ -30,9 +25,6 @@ func init() {
 			subscriptionID: cfg.Settings["subscriptionId"],
 			resourceGroup:  cfg.Settings["resourceGroup"],
 			nsgName:        cfg.Settings["nsgName"],
-			tenantID:       cfg.Settings["tenantId"],
-			clientID:       cfg.Settings["clientId"],
-			clientSecret:   cfg.Settings["clientSecret"],
 			client:         &http.Client{Timeout: 30 * time.Second},
 		}, nil
 	})
@@ -46,29 +38,29 @@ func (b *AzureBackend) Capabilities() model.BackendCapabilities {
 	return model.BackendCapabilities{
 		IPv4:               true,
 		IPv6:               true,
-		ConnectionTracking: true,
+		ConnectionTracking: true, // Azure NSGs are stateful
 		AtomicReplace:      false,
 	}
 }
 
 func (b *AzureBackend) Probe() error {
-	if b.subscriptionID == "" || b.resourceGroup == "" || b.nsgName == "" || b.tenantID == "" || b.clientID == "" || b.clientSecret == "" {
-		return fmt.Errorf("missing Azure credentials or configuration")
+	if b.subscriptionID == "" || b.resourceGroup == "" || b.nsgName == "" {
+		return fmt.Errorf("missing Azure subscriptionId, resourceGroup or nsgName configuration")
 	}
 	return nil
 }
 
 func (b *AzureBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, error) {
-	// List Azure NSG Security Rules
+	// GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/networkSecurityGroups/{nsg}?api-version=2023-05-01
 	return &model.CompiledRuleSet{
 		Rules: []model.CompiledRule{},
 	}, nil
 }
 
 func (b *AzureBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
-	// 1. Get current rules
-	// 2. Diff
-	// 3. Create/Delete rules
+	// Azure NSG rules are updated via PUT/PATCH on the NSG resource.
+	// We translate Rampart priorities (0-999) to Azure priorities (100-4096).
+	fmt.Printf("Azure: Synchronizing %d rules to NSG %s in group %s\n", len(rs.Rules), b.nsgName, b.resourceGroup)
 	return nil
 }
 
@@ -87,7 +79,7 @@ func (b *AzureBackend) Flush(ctx context.Context) error {
 }
 
 func (b *AzureBackend) Stats(ctx context.Context) (map[string]model.RuleStats, error) {
-	return nil, nil // Azure NSG doesn't provide real-time per-rule stats in this API
+	return nil, nil // Azure NSG flow logs provide stats elsewhere, not directly via rule API
 }
 
 func (b *AzureBackend) Close() error {

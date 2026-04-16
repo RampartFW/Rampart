@@ -2,11 +2,13 @@ package nftables
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,12 +17,17 @@ import (
 )
 
 type NFTablesBackend struct {
-	cfg backend.BackendConfig
+	cfg         backend.BackendConfig
+	snapshotDir string
 }
 
 func init() {
 	backend.Register("nftables", func(cfg backend.BackendConfig) (backend.Backend, error) {
-		return &NFTablesBackend{cfg: cfg}, nil
+		snapDir, _ := cfg.Settings["snapshotDir"]
+		return &NFTablesBackend{
+			cfg:         cfg,
+			snapshotDir: snapDir,
+		}, nil
 	})
 }
 
@@ -282,13 +289,24 @@ func (b *NFTablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet)
 }
 
 func (b *NFTablesBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
-	// Reconstruct state from snapshot and apply
-	// SPEC says Snapshot.State is gob-encoded RuleSet
-	// But in my model it's []byte
-	// For now, I'll assume it can be decoded back to CompiledRuleSet
-	
-	// This is a stub for now as decoding depends on how it was encoded.
-	return fmt.Errorf("rollback not fully implemented")
+	if b.snapshotDir == "" {
+		return fmt.Errorf("snapshot directory not configured for nftables backend")
+	}
+
+	path := filepath.Join(b.snapshotDir, snapshot.Filename)
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open snapshot file: %w", err)
+	}
+	defer f.Close()
+
+	var rs model.CompiledRuleSet
+	dec := gob.NewDecoder(f)
+	if err := dec.Decode(&rs); err != nil {
+		return fmt.Errorf("failed to decode ruleset from snapshot: %w", err)
+	}
+
+	return b.Apply(ctx, &rs)
 }
 
 func (b *NFTablesBackend) Flush(ctx context.Context) error {

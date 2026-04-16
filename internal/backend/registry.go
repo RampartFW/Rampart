@@ -33,7 +33,22 @@ func NewBackend(name string, cfg BackendConfig) (Backend, error) {
 
 // AutoDetect probes for the best available backend
 func AutoDetect() (Backend, error) {
-	// Priority: nftables > iptables > ebpf
+	// 1. Try to initialize Hybrid (eBPF for fast path + nftables for slow path)
+	nft, _ := NewBackend("nftables", BackendConfig{Type: "nftables"})
+	ebpf, _ := NewBackend("ebpf", BackendConfig{Type: "ebpf"})
+
+	if nft != nil && ebpf != nil && nft.Probe() == nil && ebpf.Probe() == nil {
+		// Both supported! Create hybrid. 
+		// We need to import hybrid or handle it here.
+		// For now, if both exist, we could return a hybrid implementation.
+		// Since registry doesn't know about 'ebpf' package's HybridBackend directly,
+		// we will look for a registered "hybrid" backend or fall back.
+		if factory, ok := registry["hybrid"]; ok {
+			return factory(BackendConfig{Type: "hybrid"})
+		}
+	}
+
+	// Priority fallback: nftables > iptables > ebpf
 	for _, name := range []string{"nftables", "iptables", "ebpf"} {
 		mu.RLock()
 		factory, ok := registry[name]

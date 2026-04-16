@@ -8,81 +8,112 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 )
 
-// InitCA generates a new CA key pair and certificate.
-func InitCA(caDir string) error {
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(caDir, 0755); err != nil {
-		return fmt.Errorf("failed to create CA directory: %w", err)
-	}
-
-	caKeyPath := filepath.Join(caDir, "ca.key")
-	caCertPath := filepath.Join(caDir, "ca.crt")
-
-	// Check if CA already exists
-	if _, err := os.Stat(caKeyPath); err == nil {
-		return fmt.Errorf("CA key already exists at %s", caKeyPath)
-	}
-
-	// Generate Ed25519 key pair
+// GenerateCA, cluster için bir kök CA oluşturur.
+func GenerateCA(dir string) error {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return fmt.Errorf("failed to generate Ed25519 key: %w", err)
+		return err
 	}
 
-	// Create CA certificate template
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	if err != nil {
-		return fmt.Errorf("failed to generate serial number: %w", err)
-	}
-
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
 		Subject: pkix.Name{
-			Organization: []string{"Rampart"},
+			Organization: []string{"Rampart Cluster Authority"},
 			CommonName:   "Rampart Root CA",
 		},
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0), // 10 years
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
+		NotAfter:              time.Now().AddDate(10, 0, 0),
 		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
 	}
 
-	// Create self-signed CA certificate
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, pub, priv)
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, pub, priv)
 	if err != nil {
-		return fmt.Errorf("failed to create CA certificate: %w", err)
+		return err
 	}
 
-	// Save CA key
-	keyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err := savePEM(filepath.Join(dir, "ca.crt"), "CERTIFICATE", certDER); err != nil {
+		return err
+	}
+	
+	privDER, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
-		return fmt.Errorf("failed to marshal private key: %w", err)
+		return err
 	}
-	keyOut, err := os.OpenFile(caKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open CA key file for writing: %w", err)
-	}
-	if err := pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
-		return fmt.Errorf("failed to encode CA key: %w", err)
-	}
-	keyOut.Close()
+	return savePEM(filepath.Join(dir, "ca.key"), "PRIVATE KEY", privDER)
+}
 
-	// Save CA certificate
-	certOut, err := os.Create(caCertPath)
+// GenerateNodeCert, belirli bir node için CA tarafından imzalanmış sertifika oluşturur.
+func GenerateNodeCert(nodeName, caDir, outDir string, ips []net.IP) error {
+	caCertPEM, err := os.ReadFile(filepath.Join(caDir, "ca.crt"))
 	if err != nil {
-		return fmt.Errorf("failed to open CA certificate file for writing: %w", err)
+		return err
 	}
-	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		return fmt.Errorf("failed to encode CA certificate: %w", err)
+	caKeyPEM, err := os.ReadFile(filepath.Join(caDir, "ca.key"))
+	if err != nil {
+		return err
 	}
-	certOut.Close()
 
-	return nil
+	block, _ := pem.Decode(caCertPEM)
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	block, _ = pem.Decode(caKeyPEM)
+	caPriv, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			Organization: []string{"Rampart Cluster"},
+			CommonName:   nodeName,
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		IPAddresses:  ips,
+		DNSNames:     []string{nodeName, "localhost"},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, pub, caPriv)
+	if err != nil {
+		return err
+	}
+
+	if err := savePEM(filepath.Join(outDir, nodeName+".crt"), "CERTIFICATE", certDER); err != nil {
+		return err
+	}
+	
+	privDER, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return err
+	}
+	return savePEM(filepath.Join(outDir, nodeName+".key"), "PRIVATE KEY", privDER)
+}
+
+func savePEM(path, typeStr string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return pem.Encode(f, &pem.Block{Type: typeStr, Bytes: data})
 }

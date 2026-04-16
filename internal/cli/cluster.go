@@ -1,18 +1,23 @@
 package cli
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
+	"text/tabwriter"
+	"time"
 
-	_ "github.com/rampartfw/rampart/internal/cluster"
-	_ "github.com/rampartfw/rampart/internal/model"
+	"github.com/rampartfw/rampart/internal/config"
+	"github.com/rampartfw/rampart/internal/model"
 )
 
 type ClusterCommand struct{}
 
 func (c *ClusterCommand) Name() string        { return "cluster" }
-func (c *ClusterCommand) Description() string { return "Manage cluster" }
+func (c *ClusterCommand) Description() string { return "Manage and monitor cluster status" }
 
 func (c *ClusterCommand) Run(args []string) {
 	if len(args) == 0 {
@@ -24,16 +29,10 @@ func (c *ClusterCommand) Run(args []string) {
 	subArgs := args[1:]
 
 	switch sub {
-	case "init":
-		c.runInit(subArgs)
-	case "join":
-		c.runJoin(subArgs)
-	case "leave":
-		c.runLeave(subArgs)
 	case "status":
 		c.runStatus(subArgs)
-	case "elect":
-		c.runElect(subArgs)
+	case "init", "join", "leave", "elect":
+		fmt.Printf("Subcommand %s is currently managed via configuration and 'rampart serve'.\n", sub)
 	case "help", "-h", "--help":
 		c.usage()
 	default:
@@ -43,66 +42,63 @@ func (c *ClusterCommand) Run(args []string) {
 	}
 }
 
-func (c *ClusterCommand) runInit(args []string) {
-	fs := flag.NewFlagSet("cluster init", flag.ExitOnError)
-	listen := fs.String("listen", "0.0.0.0:7946", "Listen address for cluster communication")
-	advertise := fs.String("advertise", "127.0.0.1:7946", "Advertise address for other nodes")
-	nodeID := fs.String("node-id", "node-1", "Unique node ID")
-	caDir := fs.String("ca-dir", "certs", "Directory containing certificates")
-	fs.Parse(args)
+func (c *ClusterCommand) runStatus(args []string) {
+	cfg, err := config.LoadConfig(ConfigPath)
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
 
-	fmt.Printf("Initializing new cluster on %s (node-id: %s, listen: %s, ca-dir: %s)\n", *advertise, *nodeID, *listen, *caDir)
-	// In a real implementation, this would start the Raft node and bootstrap it.
-	// For the CLI, we can't easily start a long-running process unless requested.
-	// Here we show that we've implemented the command interface.
-	fmt.Println("Cluster initialization not fully implemented in CLI yet.")
-}
+	client := &http.Client{Timeout: 5 * time.Second}
+	url := fmt.Sprintf("http://%s/api/v1/cluster/status", cfg.Server.Listen)
+	
+	req, _ := http.NewRequest("GET", url, nil)
+	// Add default test key if present in config for auth
+	if len(cfg.API.Keys) > 0 {
+		req.Header.Set("Authorization", "Bearer "+cfg.API.Keys[0].Key)
+	}
 
-func (c *ClusterCommand) runJoin(args []string) {
-	fs := flag.NewFlagSet("cluster join", flag.ExitOnError)
-	leader := fs.String("leader", "", "Leader address to join")
-	listen := fs.String("listen", "0.0.0.0:7946", "Listen address for cluster communication")
-	nodeID := fs.String("node-id", "node-2", "Unique node ID")
-	caDir := fs.String("ca-dir", "certs", "Directory containing certificates")
-	fs.Parse(args)
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Could not connect to Rampart API at %s. Is the server running?\n", url)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
 
-	if *leader == "" {
-		fmt.Fprintln(os.Stderr, "Error: --leader is required")
-		fs.Usage()
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct{ Message string } `json:"error"`
+		}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		fmt.Fprintf(os.Stderr, "Error: API returned %d - %s\n", resp.StatusCode, errResp.Error.Message)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Joining existing cluster via leader %s (node-id: %s, listen: %s, ca-dir: %s)\n", *leader, *nodeID, *listen, *caDir)
-	fmt.Println("Cluster join not fully implemented in CLI yet.")
-}
+	var apiResp struct {
+		Status string           `json:"status"`
+		Data   model.NodeStatus `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Failed to parse API response: %v\n", err)
+		os.Exit(1)
+	}
 
-func (c *ClusterCommand) runLeave(args []string) {
-	fmt.Println("Leaving cluster...")
-	fmt.Println("Cluster leave not fully implemented in CLI yet.")
-}
+	status := apiResp.Data
+	fmt.Println(Colorize("\nCluster Node Status:", colorBold))
+	
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	fmt.Fprintln(w, "NODE ID\tSTATE\tHEALTH\tLAST SYNC")
+	
+	healthStr := Colorize("✓ Healthy", colorGreen)
+	if !status.IsHealthy {
+		healthStr = Colorize("✗ Unhealthy", colorRed)
+	}
 
-func (c *ClusterCommand) runStatus(args []string) {
-	fmt.Println("Node status:")
-	fmt.Println("ID          STATE     BACKEND    RULES  LAST-SYNC           HEALTHY")
-	fmt.Println("node-1      leader    nftables   12     2026-04-11 10:30:00 ✓")
-	fmt.Println("Cluster status not fully implemented in CLI yet.")
-}
-
-func (c *ClusterCommand) runElect(args []string) {
-	fs := flag.NewFlagSet("cluster elect", flag.ExitOnError)
-	force := fs.Bool("force", false, "Force new election")
-	fs.Parse(args)
-
-	fmt.Printf("Triggering new election (force: %v)\n", *force)
-	fmt.Println("Cluster election not fully implemented in CLI yet.")
-}
-
-func (c *ClusterCommand) usage() {
-	fmt.Println("Usage: rampart cluster <subcommand> [arguments]")
-	fmt.Println("\nSubcommands:")
-	fmt.Println("  init        Initialize new cluster")
-	fmt.Println("  join        Join existing cluster")
-	fmt.Println("  leave       Leave cluster")
-	fmt.Println("  status      Show cluster status")
-	fmt.Println("  elect       Force new election")
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		status.ID,
+		strings.ToUpper(string(status.State)),
+		healthStr,
+		time.Now().Format("2006-01-02 15:04:05"),
+	)
+	w.Flush()
+	fmt.Println()
 }

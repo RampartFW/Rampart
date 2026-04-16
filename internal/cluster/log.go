@@ -149,6 +149,61 @@ func (l *Log) Truncate(index uint64) error {
 	return nil
 }
 
+// TruncateBefore removes all entries before the given index (inclusive).
+func (l *Log) TruncateBefore(index uint64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	newEntries := make([]model.LogEntry, 0)
+	for _, entry := range l.entries {
+		if entry.Index > index {
+			newEntries = append(newEntries, entry)
+		}
+	}
+	l.entries = newEntries
+
+	// Rewrite the WAL file to save disk space
+	return l.rewriteWAL()
+}
+
+func (l *Log) rewriteWAL() error {
+	// Atomic rewrite: write to .tmp and rename
+	tmpPath := l.wal.Name() + ".tmp"
+	f, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	
+	enc := gob.NewEncoder(f)
+	for _, entry := range l.entries {
+		if err := enc.Encode(entry); err != nil {
+			f.Close()
+			return err
+		}
+	}
+	
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	f.Close()
+
+	oldPath := l.wal.Name()
+	l.wal.Close()
+	if err := os.Rename(tmpPath, oldPath); err != nil {
+		return err
+	}
+
+	// Reopen for future appends
+	newWal, err := os.OpenFile(oldPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	l.wal = newWal
+	l.encoder = gob.NewEncoder(newWal)
+	return nil
+}
+
 // Close closes the WAL file.
 func (l *Log) Close() error {
 	l.mu.Lock()

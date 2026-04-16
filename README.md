@@ -6,78 +6,45 @@
   <img src="assets/banner.jpeg" alt="Rampart Banner" width="100%">
 </p>
 
-Rampart is a high-performance network policy engine that abstracts the complexity of `nftables`, `iptables`, `eBPF/XDP`, and cloud security groups (AWS, GCP, Azure) behind a single, human-readable YAML policy-as-code interface.
-
-Built entirely in Go with zero external dependencies (beyond extended stdlib), Rampart provides a unified way to manage host-level and cloud-level firewalls with strong consistency, auditability, and safety.
+Rampart is a high-performance network policy engine that abstracts the complexity of Linux firewalls and cloud security groups behind a single, human-readable YAML interface. Designed for consistency, performance, and security.
 
 ## 🚀 Key Features
 
-- **Policy-as-Code:** Define your firewall rules in version-controllable YAML.
-- **Unified Backends:** Manage `nftables`, `iptables`, and `eBPF/XDP` with the same policy.
-- **Cloud Integration:** Sync policies to AWS Security Groups, GCP Firewall Rules, and Azure NSGs.
-- **Raft Consensus:** Strong consistency across multi-host clusters.
-- **Dry-Run Mode:** `rampart plan` shows exactly what will change before applying.
-- **Safety First:** Conflict detection (shadowing, contradictions) and policy simulation.
-- **Audit Trail:** Append-only cryptographic hash chain of every modification.
-- **Rollback:** Snapshot-based instant recovery to any previous state.
-- **WebUI & API:** Modern React dashboard and REST API for programmatic access.
-- **MCP Server:** AI agent integration for intelligent firewall management.
+- **Unified Policy Engine:** Manage `nftables`, `iptables`, and `eBPF/XDP` with one YAML format.
+- **High Performance eBPF/XDP:** Fast-path packet filtering at the network driver level.
+- **Raft-based Clustering:** Secure, distributed policy synchronization with mTLS.
+- **Time-based Rules:** Automatically activate or expire rules based on flexible schedules.
+- **Packet Simulation:** Test and trace rule evaluation without affecting live traffic.
+- **AI-Ready (MCP):** Native Model Context Protocol support for agentic management.
+- **Observability:** Built-in Prometheus metrics and tamper-evident audit logs.
+- **Security Hardened:** Capability dropping and bcrypt-secured API access.
 
-## 🛠 Installation
+## 🏗️ Architecture
 
+Rampart compiles abstract policies into backend-specific rules. It supports multiple backends (nftables, iptables, eBPF) and uses a custom Raft implementation for cluster-wide consistency.
+
+## 🛠️ Quick Start
+
+### Build from source
 ```bash
-# Clone the repository
-git clone https://github.com/rampartfw/rampart
-cd rampart
-
-# Build the binary
 make build
-
-# Install (optional)
-sudo cp rampart /usr/local/bin/
 ```
 
-## 📖 Quick Start
+### Apply your first policy
+```bash
+./rampart apply -f test-policy.yaml
+```
 
-1. **Initialize the config:**
-   ```bash
-   rampart serve --config rampart.yaml
-   ```
+### Start distributed server
+```bash
+./rampart serve --config rampart.yaml
+```
 
-2. **Define a policy (`web-tier.yaml`):**
-   ```yaml
-   apiVersion: rampart.dev/v1
-   kind: PolicySet
-   metadata:
-     name: web-servers
-   policies:
-     - name: public-http
-       priority: 500
-       rules:
-         - name: allow-http
-           match:
-             protocol: tcp
-             destPorts: [80, 443]
-             sourceCIDRs: ["0.0.0.0/0"]
-           action: accept
-   ```
+## 🔒 Security
+Rampart drops unnecessary Linux capabilities after startup, uses bcrypt for API key security, and provides an append-only audit log with cryptographic integrity checks.
 
-3. **Plan and apply:**
-   ```bash
-   rampart plan -f web-tier.yaml
-   rampart apply -f web-tier.yaml
-   ```
-
-## 🏗 Architecture
-
-Rampart uses a modular architecture with a central **Policy Engine** that compiles abstract YAML policies into backend-specific rules. The **Backend Abstraction Layer (BAL)** ensures that different firewall implementations can be swapped without changing the policy definition.
-
-For multi-host setups, a **Raft-based Cluster** ensures that all nodes converge to the same desired state, while maintaining local snapshots for autonomous operation.
-
-## 🛡 Security
-
-Rampart is built for production environments. It drops unnecessary Linux capabilities after startup, uses bcrypt for API key security, and provides an append-only audit log with cryptographic integrity checks.
+## 📖 Documentation
+Detailed specifications and implementation guides can be found in the [.project/](.project/) directory.
 
 ## 📄 License
-
-Rampart is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+Rampart is licensed under the Apache License 2.0.

@@ -182,8 +182,13 @@ func (t *TCPTransport) getConn(target string) (net.Conn, error) {
 		return conn, nil
 	}
 
+	// For production readiness, set ServerName to verify peer identity correctly
+	host, _, _ := net.SplitHostPort(target)
+	conf := t.tlsConfig.Clone()
+	conf.ServerName = host
+
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	conn, err := tls.DialWithDialer(dialer, "tcp", target, t.tlsConfig)
+	conn, err := tls.DialWithDialer(dialer, "tcp", target, conf)
 	if err != nil {
 		return nil, err
 	}

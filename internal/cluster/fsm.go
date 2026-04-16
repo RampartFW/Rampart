@@ -13,12 +13,14 @@ import (
 // PolicyFSM implements the Raft FSM interface for Rampart.
 type PolicyFSM struct {
 	backend backend.Backend
+	engine  *engine.Engine
 }
 
 // NewPolicyFSM creates a new PolicyFSM.
-func NewPolicyFSM(b backend.Backend) *PolicyFSM {
+func NewPolicyFSM(b backend.Backend, e *engine.Engine) *PolicyFSM {
 	return &PolicyFSM{
 		backend: b,
+		engine:  e,
 	}
 }
 
@@ -45,14 +47,16 @@ func (f *PolicyFSM) applyPolicyUpdate(data []byte) error {
 	}
 
 	// Compile the policy
-	// Note: We might need to pass variables here if they are part of the update
 	compiled, err := engine.Compile(&ps, nil)
 	if err != nil {
 		return fmt.Errorf("failed to compile policy: %w", err)
 	}
 
+	// Update the engine's in-memory ruleset
+	f.engine.SetRules(compiled)
+
 	// Apply to backend
-	if err := f.backend.Apply(context.Background(), compiled); err != nil {
+	if err := f.engine.ReapplyRules(context.Background()); err != nil {
 		return fmt.Errorf("failed to apply policy to backend: %w", err)
 	}
 

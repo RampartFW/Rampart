@@ -153,15 +153,17 @@ type Server struct {
 	engine        *engine.Engine
 	snapshotStore *snapshot.Store
 	auditStore    *audit.Store
+	raftNode      *cluster.RaftNode
 	router        *Router
 }
 
-func NewServer(cfg *config.Config, eng *engine.Engine, ss *snapshot.Store, as *audit.Store) *Server {
+func NewServer(cfg *config.Config, eng *engine.Engine, ss *snapshot.Store, as *audit.Store, rn *cluster.RaftNode) *Server {
 	s := &Server{
 		cfg:           cfg,
 		engine:        eng,
 		snapshotStore: ss,
 		auditStore:    as,
+		raftNode:      rn,
 		router:        NewRouter(),
 	}
 

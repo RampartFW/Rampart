@@ -220,6 +220,11 @@ func (s *Store) writeEvent(event model.AuditEvent) (err error) {
 		return err
 	}
 
+	// Critical for production: Ensure data is physically on disk
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("failed to sync audit log to disk: %w", err)
+	}
+
 	return nil
 }
 

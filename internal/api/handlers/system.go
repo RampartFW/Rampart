@@ -10,18 +10,34 @@ import (
 	"github.com/rampartfw/rampart/internal/engine"
 )
 
+type RaftNode interface {
+	Status() model.NodeStatus
+}
+
 type SystemHandler struct {
-	cfg    *config.Config
-	engine *engine.Engine
+	cfg       *config.Config
+	engine    *engine.Engine
+	raftNode  RaftNode
 	startTime time.Time
 }
 
-func NewSystemHandler(cfg *config.Config, engine *engine.Engine) *SystemHandler {
+func NewSystemHandler(cfg *config.Config, engine *engine.Engine, raftNode RaftNode) *SystemHandler {
 	return &SystemHandler{
 		cfg:       cfg,
 		engine:    engine,
+		raftNode:  raftNode,
 		startTime: time.Now(),
 	}
+}
+
+func (h *SystemHandler) HandleClusterStatus(w http.ResponseWriter, r *http.Request) {
+	if h.raftNode == nil {
+		respondError(w, http.StatusServiceUnavailable, "Clustering is not enabled on this node")
+		return
+	}
+
+	status := h.raftNode.Status()
+	respondJSON(w, http.StatusOK, status)
 }
 
 func (h *SystemHandler) HandleInfo(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +114,30 @@ func (h *SystemHandler) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "rampart_rules_count %d\n", len(h.engine.CurrentRules().Rules))
 	}
 
+	// Cluster Metrics
+	if h.raftNode != nil {
+		status := h.raftNode.Status()
+		fmt.Fprintf(w, "# HELP rampart_cluster_state Raft node state (0=Follower, 1=Candidate, 2=Leader)\n")
+		fmt.Fprintf(w, "# TYPE rampart_cluster_state gauge\n")
+		stateVal := 0
+		switch status.State {
+		case model.StateCandidate:
+			stateVal = 1
+		case model.StateLeader:
+			stateVal = 2
+		}
+		fmt.Fprintf(w, "rampart_cluster_state %d\n", stateVal)
+		
+		fmt.Fprintf(w, "# HELP rampart_cluster_healthy Cluster health status\n")
+		fmt.Fprintf(w, "# TYPE rampart_cluster_healthy gauge\n")
+		healthyVal := 1
+		if !status.IsHealthy {
+			healthyVal = 0
+		}
+		fmt.Fprintf(w, "rampart_cluster_healthy %d\n", healthyVal)
+	}
+
+	// Backend Stats
 	stats, err := h.engine.Backend().Stats(r.Context())
 	if err == nil {
 		fmt.Fprintf(w, "# HELP rampart_rule_packets_total Total packets matched by rule\n")
@@ -106,8 +146,18 @@ func (h *SystemHandler) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "# TYPE rampart_rule_bytes_total counter\n")
 
 		for id, s := range stats {
-			fmt.Fprintf(w, "rampart_rule_packets_total{rule_id=\"%s\"} %d\n", id, s.Packets)
-			fmt.Fprintf(w, "rampart_rule_bytes_total{rule_id=\"%s\"} %d\n", id, s.Bytes)
+			// Find rule name for label if possible
+			ruleName := id
+			if h.engine.CurrentRules() != nil {
+				for _, r := range h.engine.CurrentRules().Rules {
+					if r.ID == id {
+						ruleName = r.Name
+						break
+					}
+				}
+			}
+			fmt.Fprintf(w, "rampart_rule_packets_total{rule_id=\"%s\", rule_name=\"%s\"} %d\n", id, ruleName, s.Packets)
+			fmt.Fprintf(w, "rampart_rule_bytes_total{rule_id=\"%s\", rule_name=\"%s\"} %d\n", id, ruleName, s.Bytes)
 		}
 	}
 }

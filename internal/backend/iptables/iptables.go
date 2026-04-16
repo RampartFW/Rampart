@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,13 +20,16 @@ import (
 type IptablesBackend struct {
 	cfg         backend.BackendConfig
 	chainPrefix string
+	snapshotDir string
 }
 
 func init() {
 	backend.Register("iptables", func(cfg backend.BackendConfig) (backend.Backend, error) {
+		snapDir, _ := cfg.Settings["snapshotDir"]
 		return &IptablesBackend{
 			cfg:         cfg,
 			chainPrefix: "RAMPART",
+			snapshotDir: snapDir,
 		}, nil
 	})
 }
@@ -307,7 +313,24 @@ func (b *IptablesBackend) DryRun(ctx context.Context, rs *model.CompiledRuleSet)
 }
 
 func (b *IptablesBackend) Rollback(ctx context.Context, snapshot *model.Snapshot) error {
-	return fmt.Errorf("rollback not fully implemented")
+	if b.snapshotDir == "" {
+		return fmt.Errorf("snapshot directory not configured for iptables backend")
+	}
+
+	path := filepath.Join(b.snapshotDir, snapshot.Filename)
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open snapshot file: %w", err)
+	}
+	defer f.Close()
+
+	var rs model.CompiledRuleSet
+	dec := gob.NewDecoder(f)
+	if err := dec.Decode(&rs); err != nil {
+		return fmt.Errorf("failed to decode ruleset from snapshot: %w", err)
+	}
+
+	return b.Apply(ctx, &rs)
 }
 
 func (b *IptablesBackend) Flush(ctx context.Context) error {

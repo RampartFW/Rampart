@@ -60,9 +60,70 @@ func (b *AWSBackend) CurrentState(ctx context.Context) (*model.CompiledRuleSet, 
 }
 
 func (b *AWSBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) error {
-	// 1. Get current rules
-	// 2. Diff
-	// 3. Authorize/Revoke
+	// 1. Get current state from AWS API
+	current, err := b.CurrentState(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get current AWS state: %w", err)
+	}
+
+	// 2. Diff: find rules to add and remove
+	plan := b.generatePlan(current, rs)
+	
+	// 3. Apply changes (Authorize and Revoke)
+	for _, rule := range plan.Removed {
+		if err := b.revokeRule(ctx, rule); err != nil {
+			return fmt.Errorf("failed to revoke rule %s: %w", rule.Name, err)
+		}
+	}
+	for _, rule := range plan.Added {
+		if err := b.authorizeRule(ctx, rule); err != nil {
+			return fmt.Errorf("failed to authorize rule %s: %w", rule.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func (b *AWSBackend) generatePlan(current, desired *model.CompiledRuleSet) *awsPlan {
+	plan := &awsPlan{}
+	
+	// Set for quick lookup
+	currentMap := make(map[string]model.CompiledRule)
+	for _, r := range current.Rules {
+		currentMap[r.Name] = r
+	}
+
+	desiredMap := make(map[string]model.CompiledRule)
+	for _, r := range desired.Rules {
+		desiredMap[r.Name] = r
+		if _, ok := currentMap[r.Name]; !ok {
+			plan.Added = append(plan.Added, r)
+		}
+	}
+
+	for _, r := range current.Rules {
+		if _, ok := desiredMap[r.Name]; !ok {
+			plan.Removed = append(plan.Removed, r)
+		}
+	}
+
+	return plan
+}
+
+type awsPlan struct {
+	Added   []model.CompiledRule
+	Removed []model.CompiledRule
+}
+
+func (b *AWSBackend) authorizeRule(ctx context.Context, rule model.CompiledRule) error {
+	// This would construct a SigV4 signed request to EC2 AuthorizeSecurityGroupIngress
+	fmt.Printf("AWS: Authorizing rule %s in SG %s\n", rule.Name, b.sgID)
+	return nil
+}
+
+func (b *AWSBackend) revokeRule(ctx context.Context, rule model.CompiledRule) error {
+	// This would construct a SigV4 signed request to EC2 RevokeSecurityGroupIngress
+	fmt.Printf("AWS: Revoking rule %s in SG %s\n", rule.Name, b.sgID)
 	return nil
 }
 

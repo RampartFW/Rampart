@@ -10,17 +10,23 @@ import (
 	"github.com/rampartfw/rampart/internal/model"
 )
 
+type RaftNode interface {
+	Propose(entryType model.EntryType, data []byte) error
+}
+
 type PolicyHandler struct {
 	engine        *engine.Engine
 	snapshotStore *snapshot.Store
 	auditStore    *audit.Store
+	raftNode      RaftNode
 }
 
-func NewPolicyHandler(eng *engine.Engine, ss *snapshot.Store, as *audit.Store) *PolicyHandler {
+func NewPolicyHandler(eng *engine.Engine, ss *snapshot.Store, as *audit.Store, rn RaftNode) *PolicyHandler {
 	return &PolicyHandler{
 		engine:        eng,
 		snapshotStore: ss,
 		auditStore:    as,
+		raftNode:      rn,
 	}
 }
 
@@ -50,6 +56,17 @@ func (h *PolicyHandler) HandleApply(w http.ResponseWriter, r *http.Request) {
 	var ps model.PolicySetYAML
 	if err := json.NewDecoder(r.Body).Decode(&ps); err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// If Raft is enabled, propose the update
+	if h.raftNode != nil {
+		data, _ := json.Marshal(ps)
+		if err := h.raftNode.Propose(model.EntryPolicyUpdate, data); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]string{"message": "Policy update proposed to cluster"})
 		return
 	}
 
@@ -131,6 +148,24 @@ func (h *PolicyHandler) HandleConflicts(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
+	// If Raft is enabled, propose a flush (empty policy update)
+	if h.raftNode != nil {
+		emptyPS := model.PolicySetYAML{
+			APIVersion: "rampart.dev/v1",
+			Kind:       "PolicySet",
+			Metadata: model.PolicyMetadata{
+				Name: "flushed",
+			},
+		}
+		data, _ := json.Marshal(emptyPS)
+		if err := h.raftNode.Propose(model.EntryPolicyUpdate, data); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]string{"message": "Policy flush proposed to cluster"})
+		return
+	}
+
 	current := h.engine.CurrentRules()
 	var beforeJSON []byte
 	if current != nil {

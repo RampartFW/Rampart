@@ -1,30 +1,32 @@
-# Build stage
+# Build Web UI
+FROM node:20-alpine AS ui-builder
+WORKDIR /ui
+COPY ui/package*.json ./
+RUN npm ci
+COPY ui/ ./
+RUN npm run build
+
+# Build Go Backend
 FROM golang:1.24-alpine AS builder
-
 WORKDIR /app
-
-# Install dependencies
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy source code
 COPY . .
-
-# Build the binary
+# Copy pre-built UI from ui-builder stage
+COPY --from=ui-builder /ui/dist ./ui/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o rampart ./cmd/rampart
 
 # Final stage
 FROM alpine:3.19
-
 WORKDIR /app
 
-# Install runtime dependencies (nftables, iptables)
-RUN apk add --no-color nftables iptables ip6tables ca-certificates
+# Install runtime dependencies (firewall tools)
+RUN apk add --no-cache nftables iptables ip6tables ca-certificates
 
 # Copy the binary from builder
 COPY --from=builder /app/rampart /usr/local/bin/rampart
 
-# Create config and data directories
+# Create necessary directories
 RUN mkdir -p /etc/rampart /var/lib/rampart/snapshots /var/lib/rampart/audit
 
 # Expose API and Raft ports

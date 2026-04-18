@@ -14,11 +14,12 @@
     "@tanstack/react-query": "^5.0.0",
     "@uiw/react-codemirror": "^4.23.0",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.453.0",
     "react": "^19.0.0-rc.0",
     "react-dom": "^19.0.0-rc.0",
     "react-router-dom": "^7.0.0",
-    "tailwind-merge": "^2.5.4"
+    "tailwind-merge": "^2.6.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0-alpha.25",

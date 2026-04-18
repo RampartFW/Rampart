@@ -1,27 +1,30 @@
 # Rampart
 
-**Unified Network Policy Engine for Linux & Cloud**
+**Autonomous Network Defense & Policy Orchestration Platform**
 
 <p align="center">
   <img src="assets/banner.jpeg" alt="Rampart Banner" width="100%">
 </p>
 
-Rampart is a high-performance network policy engine that abstracts the complexity of Linux firewalls and cloud security groups behind a single, human-readable YAML interface. Designed for consistency, performance, and security.
+Rampart is a high-performance, autonomous network policy engine that abstracts the complexity of Linux firewalls (`nftables`, `eBPF/XDP`) and Cloud security groups (AWS, GCP, Azure) behind a single, intelligent YAML interface. 
+
+Beyond simple filtering, Rampart features a built-in **Autonomous Sentinel** that analyzes traffic patterns in real-time to detect and mitigate threats automatically across distributed clusters.
 
 ## 🚀 Key Features
 
-- **Unified Policy Engine:** Manage `nftables`, `iptables`, and `eBPF/XDP` with one YAML format.
-- **High Performance eBPF/XDP:** Fast-path packet filtering at the network driver level.
+- **Unified Policy Engine:** Single YAML format for `nftables`, `iptables`, and `eBPF/XDP`.
+- **Autonomous IPS (Sentinel):** Real-time threat scoring and automated cluster-wide IP banning.
+- **Deep Packet Inspection (DPI):** Layer-7 filtering support for DNS, HTTP, and TLS SNI.
+- **Multi-Cloud Orchestration:** Simultaneous rule deployment to AWS, GCP, and Azure.
 - **Raft-based Clustering:** Secure, distributed policy synchronization with mTLS.
-- **Time-based Rules:** Automatically activate or expire rules based on flexible schedules.
-- **Packet Simulation:** Test and trace rule evaluation without affecting live traffic.
-- **AI-Ready (MCP):** Native Model Context Protocol support for agentic management.
-- **Observability:** Built-in Prometheus metrics and tamper-evident audit logs.
-- **Security Hardened:** Capability dropping and bcrypt-secured API access.
+- **Self-Healing Watchdog:** Continuous backend monitoring and automatic state correction.
+- **Cloud-Native Integration:** Dynamic IP sets with native Kubernetes pod discovery.
+- **Observability:** Built-in Prometheus metrics, SIEM (Syslog) integration, and tamper-evident audit logs.
+- **AI-Ready (MCP):** Native Model Context Protocol support for agentic security orchestration.
 
 ## 🏗️ Architecture
 
-Rampart compiles abstract policies into backend-specific rules. It supports multiple backends (nftables, iptables, eBPF) and uses a custom Raft implementation for cluster-wide consistency.
+Rampart operates as a distributed control plane. It compiles abstract intent into backend-specific instructions, utilizing eBPF for the high-speed "fast-path" and traditional firewalls for complex stateful logic. The **Autonomous Sentinel** loop continuously feeds DPI signals into a risk-scoring engine to provide pro-active defense.
 
 ## 🛠️ Quick Start
 
@@ -30,21 +33,26 @@ Rampart compiles abstract policies into backend-specific rules. It supports mult
 make build
 ```
 
-### Apply your first policy
+### Apply a unified policy
 ```bash
-./rampart apply -f test-policy.yaml
+./rampart apply -f my-policy.yaml
 ```
 
-### Start distributed server
+### Start distributed autonomous node
 ```bash
+export RAMPART_MCP_ENABLED=true
 ./rampart serve --config rampart.yaml
 ```
 
 ## 🔒 Security
-Rampart drops unnecessary Linux capabilities after startup, uses bcrypt for API key security, and provides an append-only audit log with cryptographic integrity checks.
+Rampart implements industry-leading security standards:
+- **mTLS:** Encrypted peer-to-peer cluster communication.
+- **Capability Dropping:** Process operates with minimal Linux privileges.
+- **Integrity:** Cryptographic hash-chaining for all audit logs.
+- **Recovery:** Global panic handlers and atomic rollback support.
 
 ## 📖 Documentation
-Detailed specifications and implementation guides can be found in the [.project/](.project/) directory.
+Detailed specifications, implementation guides, and roadmap can be found in the [.project/](.project/) directory.
 
 ## 📄 License
 Rampart is licensed under the Apache License 2.0.

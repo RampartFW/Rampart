@@ -136,6 +136,13 @@ func matchesPacket(match model.CompiledMatch, pkt model.SimulatedPacket) bool {
 		}
 	}
 
+	// Layer-7 / DPI Analysis (Milestone 21)
+	if match.AppProtocol != "" {
+		if !MatchesL7(model.CompiledRule{Match: match}, pkt.Payload) {
+			return false
+		}
+	}
+
 	return true
 }
 

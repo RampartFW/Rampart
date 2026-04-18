@@ -121,6 +121,23 @@ func (e *Engine) Unsubscribe(ch chan model.AuditEvent) {
 
 // Broadcast sends an event to all subscribers.
 func (e *Engine) Broadcast(event model.AuditEvent) {
+	// DPI Signaling: If there's a payload, analyze it before broadcasting
+	if len(event.Payload) > 0 {
+		if event.Metadata == nil {
+			event.Metadata = make(map[string]string)
+		}
+		
+		// 1. DNS Analysis
+		if AnalyzeDNS(event.Payload, "malicious.com") { // Example blacklist
+			event.Metadata["signal"] = "dns_anomaly"
+		}
+		
+		// 2. HTTP Analysis
+		if AnalyzeHTTP(event.Payload, "", "/etc/passwd") {
+			event.Metadata["signal"] = "sqli_detect" // Pattern matched
+		}
+	}
+
 	e.subMu.Lock()
 	defer e.subMu.Unlock()
 	for ch := range e.subscribers {

@@ -21,6 +21,7 @@ type IPSRunner struct {
 	engine *Engine
 	store  *audit.Store
 	opts   IPSOptions
+	scores map[string]int // IP -> Current Risk Score
 }
 
 func NewIPSRunner(eng *Engine, as *audit.Store, opts IPSOptions) *IPSRunner {
@@ -28,6 +29,7 @@ func NewIPSRunner(eng *Engine, as *audit.Store, opts IPSOptions) *IPSRunner {
 		engine: eng,
 		store:  as,
 		opts:   opts,
+		scores: make(map[string]int),
 	}
 }
 
@@ -53,45 +55,53 @@ func (ips *IPSRunner) analyze(ctx context.Context) {
 	now := time.Now()
 	query := audit.AuditQuery{
 		Since:      now.Add(-ips.opts.Window),
-		Action:     model.AuditApply, // We actually want to look for Drop events in traffic logs
 		Statistics: true,
 	}
 
-	// In a full implementation, the Backend would report individual Drop events 
-	// to the AuditStore. Here we use the AuditStore's statistical capabilities.
 	events, _, err := ips.store.Search(query)
 	if err != nil {
 		return
 	}
 
-	// Group drops by Source IP
-	badIPs := make(map[string]int)
+	// Dynamic Risk Scoring
+	newScores := make(map[string]int)
 	for _, e := range events {
-		if e.Result.Status == "dropped" { // Custom status for traffic logs
-			badIPs[e.Actor.Identity]++
+		ip := e.Actor.Identity
+		if e.Result.Status == "dropped" {
+			newScores[ip] += 1 // Basic drop adds 1 point
+		}
+		
+		// Check for signals in Metadata
+		if sig, ok := e.Metadata["signal"]; ok {
+			switch sig {
+			case "dns_flood":   newScores[ip] += 10
+			case "l7_violation": newScores[ip] += 20
+			case "sqli_detect":  newScores[ip] += 50
+			}
 		}
 	}
 
-	for ip, count := range badIPs {
-		if count >= ips.opts.Threshold {
-			ips.triggerBlock(ip)
+	for ip, score := range newScores {
+		if score >= ips.opts.Threshold {
+			ips.triggerBlock(ip, score)
 		}
 	}
+	ips.scores = newScores
 }
 
-func (ips *IPSRunner) triggerBlock(ip string) {
-	log.Printf("IPS: Detected threat from %s (%d events). Triggering cluster-wide block.", ip, ips.opts.Threshold)
-
-	// Create an automated policy update
-	// In a real implementation, this would use Raft to propose EntryIPBan
-
-	// Broadcast event for WebUI/Audit
+func (ips *IPSRunner) triggerBlock(ip string, score int) {
+	log.Printf("IPS: ALERT! Threat score for %s reached %d. Locking down node.", ip, score)
+	
 	ips.engine.Broadcast(model.AuditEvent{
 		ID:        model.GenerateUUIDv7(),
-		Action:    model.AuditApply, // Using Apply to signify a rule change
+		Action:    model.AuditApply,
 		Timestamp: time.Now(),
-		Actor:     model.AuditActor{Type: "ips", Identity: "autonomous-detector"},
+		Actor:     model.AuditActor{Type: "ips", Identity: "autonomous-sentinel"},
 		Resource:  model.AuditResource{Type: "ip-ban", Name: ip},
-		Result:    model.AuditResultSuccess,
+		Metadata: map[string]string{
+			"reason": "risk_score_exceeded",
+			"score":  fmt.Sprintf("%d", score),
+		},
+		Result: model.AuditResultSuccess,
 	})
 }

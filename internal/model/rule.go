@@ -47,12 +47,32 @@ type CompiledMatch struct {
 	Interfaces  []string       `json:"interfaces,omitempty"`
 	States      []ConnState    `json:"states,omitempty"`
 	ICMPTypes   []uint8        `json:"icmpTypes,omitempty"`
-	IPVersion   IPVersion      `json:"ipVersion,omitempty"`
-	Negated     *CompiledMatch `json:"negated,omitempty"`
+	IPVersion    IPVersion      `json:"ipVersion,omitempty"`
+	Negated      *CompiledMatch `json:"negated,omitempty"`
+
+	// Layer-7 / DPI Fields (Milestone 21)
+	AppProtocol string     `json:"appProtocol,omitempty"` // "http", "tls", "dns"
+	HTTP        *HTTPMatch `json:"http,omitempty"`
+	TLS         *TLSMatch  `json:"tls,omitempty"`
+	DNS         *DNSMatch  `json:"dns,omitempty"`
 
 	// Internal cache for faster conflict detection
 	SrcIntervals []IPInterval `json:"-"`
 	DstIntervals []IPInterval `json:"-"`
+}
+
+type HTTPMatch struct {
+	Host   string `json:"host,omitempty"`
+	Method string `json:"method,omitempty"`
+	Path   string `json:"path,omitempty"`
+}
+
+type TLSMatch struct {
+	SNI string `json:"sni,omitempty"`
+}
+
+type DNSMatch struct {
+	Query string `json:"query,omitempty"`
 }
 
 type IPInterval struct {

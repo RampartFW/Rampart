@@ -30,6 +30,7 @@ type AuditEvent struct {
 	After     json.RawMessage   `json:"after,omitempty"`
 	Result    AuditResult       `json:"result"`
 	Metadata  map[string]string `json:"metadata,omitempty"`
+	Payload   []byte            `json:"payload,omitempty"` // For DPI analysis
 	ChainHash string            `json:"chainHash,omitempty"`
 }
 

@@ -43,12 +43,15 @@ jobs:
           cd ui
           npm ci
           npm run build
+          mkdir -p ../internal/api/ui/dist
+          cp -r dist/* ../internal/api/ui/dist/
 
       - name: Build Binary 🔨
         run: |
+          VERSION=${GITHUB_REF#refs/tags/}
           BINARY_NAME=rampart-${{ matrix.goos }}-${{ matrix.goarch }}
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-          go build -ldflags="-s -w" -o $BINARY_NAME ./cmd/rampart
+          go build -ldflags="-s -w -X 'github.com/rampartfw/rampart/internal/version.Version=$VERSION'" -o $BINARY_NAME ./cmd/rampart
           echo "BINARY_PATH=$BINARY_NAME" >> $GITHUB_ENV
 
       - name: Upload Release Asset 📤

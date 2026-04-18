@@ -8,7 +8,7 @@ import (
 
 func TestCompile(t *testing.T) {
 	ps := &model.PolicySetYAML{
-		APIVersion: "rampart.dev/v1",
+		APIVersion: "rampartfw.com/v1",
 		Kind:       "PolicySet",
 		Metadata: model.PolicyMetadata{
 			Name: "test-policy",
@@ -102,7 +102,7 @@ func TestCompile(t *testing.T) {
 
 func TestCompileWithLineNumbers(t *testing.T) {
 	data := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: test
@@ -162,3 +162,4 @@ func TestParsePorts(t *testing.T) {
 		}
 	}
 }
+

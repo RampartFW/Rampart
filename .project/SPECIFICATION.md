@@ -6,7 +6,7 @@
 > **Dependencies:** Zero (stdlib + golang.org/x/crypto, golang.org/x/sys, gopkg.in/yaml.v3 only)  
 > **Binary:** Single static binary (server + agent + CLI unified)  
 > **License:** Apache 2.0  
-> **Domain:** rampart.dev  
+> **Domain:** rampartfw.com  
 > **Repository:** github.com/rampartfw/rampart
 
 ---
@@ -254,7 +254,7 @@ type RecurringSpec struct {
 
 ```yaml
 # rampart-policy.yaml
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: production-web-tier
@@ -389,7 +389,7 @@ policies:
 
 ### 5.2 YAML Validation Rules
 
-- `apiVersion` must be `rampart.dev/v1`
+- `apiVersion` must be `rampartfw.com/v1`
 - `kind` must be `PolicySet`
 - Policy names must be unique within a PolicySet
 - Rule names must be unique within a Policy
@@ -405,7 +405,7 @@ policies:
 
 ```yaml
 # rampart-vars.yaml
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: Variables
 metadata:
   name: production-vars
@@ -2007,3 +2007,4 @@ rampart/
 
 **Positioning statement:**
 Rampart is a network policy engine that replaces manual firewall rule management with policy-as-code, audit trails, instant rollback, and multi-host synchronization — all in a single Go binary with zero dependencies. It speaks nftables, iptables, eBPF, and cloud security groups through a unified YAML interface.
+

@@ -45,7 +45,7 @@ func TestPolicyHandlers(t *testing.T) {
 
 	t.Run("HandleApply", func(t *testing.T) {
 		psBody := model.PolicySetYAML{
-			APIVersion: "rampart.dev/v1",
+			APIVersion: "rampartfw.com/v1",
 			Kind:       "PolicySet",
 			Metadata:   model.PolicyMetadata{Name: "test-policy"},
 			Policies: []model.PolicyYAML{
@@ -120,3 +120,4 @@ func TestPolicyHandlers(t *testing.T) {
 		}
 	})
 }
+

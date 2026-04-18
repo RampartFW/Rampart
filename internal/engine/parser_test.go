@@ -7,7 +7,7 @@ import (
 
 func TestParsePolicyFile(t *testing.T) {
 	content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: test-policy
@@ -52,7 +52,7 @@ policies:
 
 func TestParsePolicyFileWithVars(t *testing.T) {
 	content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: test-policy
@@ -92,7 +92,7 @@ policies:
 
 func TestParsePolicyData_CIDRNormalization(t *testing.T) {
 	content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: test-policy
@@ -124,3 +124,4 @@ policies:
 		t.Errorf("expected 192.168.1.0/24, got %s", cidrs[2])
 	}
 }
+

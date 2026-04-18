@@ -23,7 +23,7 @@ No version control. No audit trail. No rollback. No dry-run. No multi-host sync.
 
 ```yaml
 # rampart-policy.yaml
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: production-web
@@ -151,7 +151,7 @@ AI agents can manage your firewall through the Model Context Protocol.
 
 ```bash
 # Binary
-curl -fsSL https://rampart.dev/install.sh | sh
+curl -fsSL https://rampartfw.com/install.sh | sh
 
 # Go install
 go install github.com/rampartfw/rampart/cmd/rampart@latest
@@ -165,7 +165,7 @@ docker run -d --cap-add NET_ADMIN --name rampart rampartfw/rampart serve
 ```bash
 # Create a policy file
 cat > policy.yaml << 'EOF'
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: my-server
@@ -289,11 +289,12 @@ Apache License 2.0
 
 ## Links
 
-- **Website:** [rampart.dev](https://rampart.dev)
-- **Documentation:** [docs.rampart.dev](https://docs.rampart.dev)
+- **Website:** [rampartfw.com](https://rampartfw.com)
+- **Documentation:** [docs.rampartfw.com](https://docs.rampartfw.com)
 - **GitHub:** [github.com/rampartfw/rampart](https://github.com/rampartfw/rampart)
 - **Docker Hub:** [rampartfw/rampart](https://hub.docker.com/r/rampartfw/rampart)
 
 ---
 
 *Built with 🏰 by [ECOSTACK TECHNOLOGY OÜ](https://ecostack.dev)*
+

@@ -53,7 +53,7 @@ func TestSubstituteVars_Unresolved(t *testing.T) {
 
 func TestParseVariablesFile(t *testing.T) {
 	content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: Variables
 metadata:
   name: test-vars
@@ -84,3 +84,4 @@ variables:
 		t.Errorf("expected subnet 10.0.1.0/24, got %v", vars["subnet"])
 	}
 }
+

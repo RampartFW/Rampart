@@ -331,7 +331,7 @@ Validation is performed programmatically (no JSON Schema dependency):
 func validateSchema(ps *PolicySetYAML) error {
     var errs []error
     
-    if ps.APIVersion != "rampart.dev/v1" {
+    if ps.APIVersion != "rampartfw.com/v1" {
         errs = append(errs, fmt.Errorf("unsupported apiVersion: %s", ps.APIVersion))
     }
     if ps.Kind != "PolicySet" {
@@ -1882,3 +1882,4 @@ func (m *MockBackend) Apply(rs *CompiledRuleSet) error { m.rules = rs.Rules; m.a
 func (m *MockBackend) DryRun(rs *CompiledRuleSet) (*ExecutionPlan, error) { return GeneratePlan(&CompiledRuleSet{Rules: m.rules}, rs), nil }
 // ...
 ```
+

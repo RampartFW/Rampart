@@ -19,7 +19,7 @@ func TestResolveIncludes(t *testing.T) {
 	incPath := filepath.Join(tmpDir, "inc.yaml")
 
 	baseContent := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: base
@@ -32,7 +32,7 @@ policies:
         action: accept
 `
 	incContent := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: inc
@@ -87,7 +87,7 @@ func TestResolveIncludes_Circular(t *testing.T) {
 	p2 := filepath.Join(tmpDir, "p2.yaml")
 
 	p1Content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: p1
@@ -95,7 +95,7 @@ includes:
   - path: p2.yaml
 `
 	p2Content := `
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: p2
@@ -129,3 +129,4 @@ func TestResolveIncludes_NotFound(t *testing.T) {
 		t.Error("expected error for missing include, got nil")
 	}
 }
+

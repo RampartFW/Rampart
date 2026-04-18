@@ -127,10 +127,10 @@ Stylized padlock where the lock body is a brick pattern (wall) and the shackle i
 
 | Property | Value |
 |----------|-------|
-| **Primary domain** | rampart.dev |
+| **Primary domain** | rampartfw.com |
 | **GitHub org** | github.com/rampartfw |
 | **Repository** | github.com/rampartfw/rampart |
-| **Documentation** | docs.rampart.dev |
+| **Documentation** | docs.rampartfw.com |
 | **Go pkg** | pkg.go.dev/github.com/rampartfw/rampart |
 | **Docker Hub** | hub.docker.com/r/rampartfw/rampart |
 
@@ -321,3 +321,4 @@ Rampart bunu compile-time'da yakalıyor. Apply etmeden ÖNCE uyarıyor.
 | Single Binary | ✅ Go | ✅ Python | ✅ C/Python | ✅ Go | ❌ Python |
 | Zero Dependencies | ✅ | ❌ | ❌ | ✅ | ❌ |
 | MCP Server | ✅ | ❌ | ❌ | ❌ | ❌ |
+

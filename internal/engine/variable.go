@@ -59,7 +59,7 @@ func ParseVariablesFile(path string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("unmarshal variables: %w", err)
 	}
 
-	if vars.APIVersion != "rampart.dev/v1" {
+	if vars.APIVersion != "rampartfw.com/v1" {
 		return nil, fmt.Errorf("unsupported apiVersion: %s", vars.APIVersion)
 	}
 
@@ -95,3 +95,4 @@ func SubstituteVars(data []byte, vars map[string]interface{}) ([]byte, error) {
 
 	return result, nil
 }
+

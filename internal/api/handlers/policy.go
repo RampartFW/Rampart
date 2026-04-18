@@ -147,7 +147,7 @@ func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
 	// If Raft is enabled, propose a flush (empty policy update)
 	if h.raftNode != nil {
 		emptyPS := model.PolicySetYAML{
-			APIVersion: "rampart.dev/v1",
+			APIVersion: "rampartfw.com/v1",
 			Kind:       "PolicySet",
 			Metadata: model.PolicyMetadata{
 				Name: "flushed",
@@ -190,3 +190,4 @@ func (h *PolicyHandler) HandleFlush(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "All rules flushed"})
 }
+

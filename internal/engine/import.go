@@ -12,7 +12,7 @@ import (
 
 func ImportIptablesSave(data []byte) (*model.PolicySetYAML, error) {
 	ps := &model.PolicySetYAML{
-		APIVersion: "rampart.dev/v1",
+		APIVersion: "rampartfw.com/v1",
 		Kind:       "PolicySet",
 		Metadata: model.PolicyMetadata{
 			Name:        "imported-iptables",
@@ -129,7 +129,7 @@ func ImportNftables(data []byte) (*model.PolicySetYAML, error) {
 	}
 
 	ps := &model.PolicySetYAML{
-		APIVersion: "rampart.dev/v1",
+		APIVersion: "rampartfw.com/v1",
 		Kind:       "PolicySet",
 		Metadata: model.PolicyMetadata{
 			Name:        "imported-nftables",
@@ -223,3 +223,4 @@ func ImportNftables(data []byte) (*model.PolicySetYAML, error) {
 
 	return ps, nil
 }
+

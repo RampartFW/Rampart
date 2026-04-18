@@ -1,4 +1,4 @@
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: test-web-server
@@ -29,3 +29,4 @@ policies:
           destPorts: 22
           sourceCIDRs: 
             - 192.168.1.0/24
+

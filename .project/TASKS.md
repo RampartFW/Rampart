@@ -82,7 +82,7 @@ P2     → Nice to have (post-MVP)
 - **Dependencies:** T-003
 - **Description:** `internal/engine/validator.go`. Programmatic validation of parsed YAML. Check all constraints from SPECIFICATION §5.2.
 - **Acceptance Criteria:**
-  - [ ] apiVersion must be "rampart.dev/v1"
+  - [ ] apiVersion must be "rampartfw.com/v1"
   - [ ] kind must be "PolicySet"
   - [ ] metadata.name required, non-empty
   - [ ] Policy names unique within PolicySet
@@ -1047,3 +1047,4 @@ P2     → Nice to have (post-MVP)
 
 **MVP (P0 only):** M1 + M2 + M3 + M4 + M5 + M6 + M7 + M10 + M15 = ~19 days
 **Full v1.0:** All milestones = ~45 days (~9 weeks)
+

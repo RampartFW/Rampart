@@ -8,7 +8,7 @@ import (
 
 func TestValidatePolicySet_Valid(t *testing.T) {
 	ps := &model.PolicySetYAML{
-		APIVersion: "rampart.dev/v1",
+		APIVersion: "rampartfw.com/v1",
 		Kind:       "PolicySet",
 		Metadata: model.PolicyMetadata{
 			Name: "test-policy",
@@ -54,7 +54,7 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "wrong-kind",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "WrongKind",
 				Metadata: model.PolicyMetadata{
 					Name: "test",
@@ -64,14 +64,14 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "missing-metadata-name",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 			},
 		},
 		{
 			name: "duplicate-policy-name",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 				Metadata: model.PolicyMetadata{Name: "test"},
 				Policies: []model.PolicyYAML{
@@ -83,7 +83,7 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "invalid-priority",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 				Metadata: model.PolicyMetadata{Name: "test"},
 				Policies: []model.PolicyYAML{
@@ -94,7 +94,7 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "duplicate-rule-name",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 				Metadata: model.PolicyMetadata{Name: "test"},
 				Policies: []model.PolicyYAML{
@@ -111,7 +111,7 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "invalid-action",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 				Metadata: model.PolicyMetadata{Name: "test"},
 				Policies: []model.PolicyYAML{
@@ -127,7 +127,7 @@ func TestValidatePolicySet_Invalid(t *testing.T) {
 		{
 			name: "invalid-cidr",
 			ps: &model.PolicySetYAML{
-				APIVersion: "rampart.dev/v1",
+				APIVersion: "rampartfw.com/v1",
 				Kind:       "PolicySet",
 				Metadata: model.PolicyMetadata{Name: "test"},
 				Policies: []model.PolicyYAML{
@@ -181,3 +181,4 @@ func TestValidatePorts(t *testing.T) {
 		})
 	}
 }
+

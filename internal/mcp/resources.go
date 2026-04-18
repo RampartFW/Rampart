@@ -94,7 +94,7 @@ func (s *Server) readCurrentPolicy(id interface{}) *Response {
 				map[string]interface{}{
 					"uri":      "rampart://policies/current",
 					"mimeType": "application/x-yaml",
-					"text":     "apiVersion: rampart.dev/v1\nkind: PolicySet\nmetadata:\n  name: current\npolicies: []",
+					"text":     "apiVersion: rampartfw.com/v1\nkind: PolicySet\nmetadata:\n  name: current\npolicies: []",
 				},
 			},
 		},
@@ -150,3 +150,4 @@ func (s *Server) readClusterStatus(id interface{}) *Response {
 		},
 	}
 }
+

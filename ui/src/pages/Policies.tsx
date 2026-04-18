@@ -5,7 +5,7 @@ import { Save, Play, AlertTriangle } from 'lucide-react';
 
 const Policies: React.FC = () => {
   const [code, setCode] = useState(`# rampart-policy.yaml
-apiVersion: rampart.dev/v1
+apiVersion: rampartfw.com/v1
 kind: PolicySet
 metadata:
   name: production-web-tier
@@ -97,3 +97,4 @@ policies:
 };
 
 export default Policies;
+

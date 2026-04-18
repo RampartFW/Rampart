@@ -2,8 +2,6 @@ package engine
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"strings"
 
 	"github.com/rampartfw/rampart/internal/model"

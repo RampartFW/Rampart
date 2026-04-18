@@ -140,7 +140,7 @@ func (c *ApplyCommand) Run(args []string) {
 	ExitOnError(err, "Apply rules")
 
 	// 9. Audit
-	auditStore, err := audit.NewStore(cfg.Audit.Directory, cfg.Audit.Retention)
+	auditStore, err := audit.NewStore(cfg.Audit)
 	if err == nil {
 		_ = auditStore.Record(model.AuditEvent{
 			Action: model.AuditApply,

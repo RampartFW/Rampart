@@ -151,11 +151,11 @@ const Hero = () => {
           <div className="p-6 md:p-8 font-mono text-sm md:text-base bg-zinc-950/50">
             <pre className="text-zinc-300 leading-relaxed overflow-x-auto">
               <code>{`apiVersion: rampartfw.com/v1
-          kind: PolicySet
-          metadata:
-          name: "global-ingress"`}</code>
-            </pre>
-          </div>
+kind: PolicySet
+metadata:
+  name: "global-ingress"
+
+policies:
   - name: "autonomous-protection"
     priority: 100
     rules:

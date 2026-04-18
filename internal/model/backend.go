@@ -36,6 +36,7 @@ type SimulatedPacket struct {
 	Direction  Direction
 	Interface  string
 	State      ConnState
+	Payload    []byte // For DPI simulation (Milestone 21)
 }
 
 type SimulationResult struct {

@@ -41,7 +41,7 @@ func (c *CertCommand) runInit(args []string) {
 	caDir := fs.String("ca-dir", "certs", "Directory to store CA certificates")
 	fs.Parse(args)
 
-	if err := cert.InitCA(*caDir); err != nil {
+	if err := cert.GenerateCA(*caDir); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -53,6 +53,7 @@ func (c *CertCommand) runGenerate(args []string) {
 	fs := flag.NewFlagSet("cert generate", flag.ExitOnError)
 	nodeName := fs.String("node-name", "", "Name of the node")
 	caDir := fs.String("ca-dir", "certs", "Directory containing CA certificates")
+	outDir := fs.String("out-dir", ".", "Directory to store generated node certificates")
 	fs.Parse(args)
 
 	if *nodeName == "" {
@@ -61,12 +62,13 @@ func (c *CertCommand) runGenerate(args []string) {
 		os.Exit(1)
 	}
 
-	if err := cert.GenerateNodeCert(*nodeName, *caDir); err != nil {
+	// Generate for localhost by default for testing
+	if err := cert.GenerateNodeCert(*nodeName, *caDir, *outDir, nil); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Successfully generated certificate for node %s in %s\n", *nodeName, *caDir)
+	fmt.Printf("Successfully generated certificate for node %s in %s\n", *nodeName, *outDir)
 }
 
 func (c *CertCommand) usage() {

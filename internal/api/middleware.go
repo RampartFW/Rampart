@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/subtle"
-	"fmt"
 	"log"
 	"net/http"
 	"runtime/debug"

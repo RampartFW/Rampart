@@ -168,26 +168,12 @@ func (s *Server) handleToolsCall(req *Request) *Response {
 	switch params.Name {
 	case "list_rules":
 		return s.callListRules(req.ID, params.Arguments)
-	case "add_rule":
-		return s.callAddRule(req.ID, params.Arguments)
-	case "remove_rule":
-		return s.callRemoveRule(req.ID, params.Arguments)
 	case "plan_policy":
 		return s.callPlanPolicy(req.ID, params.Arguments)
-	case "apply_policy":
-		return s.callApplyPolicy(req.ID, params.Arguments)
 	case "simulate_packet":
 		return s.callSimulatePacket(req.ID, params.Arguments)
-	case "rollback":
-		return s.callRollback(req.ID, params.Arguments)
-	case "list_snapshots":
-		return s.callListSnapshots(req.ID, params.Arguments)
-	case "audit_search":
-		return s.callAuditSearch(req.ID, params.Arguments)
 	case "cluster_status":
 		return s.callClusterStatus(req.ID, params.Arguments)
-	case "get_rule_stats":
-		return s.callGetRuleStats(req.ID, params.Arguments)
 	default:
 		return &Response{
 			JSONRPC: "2.0",

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/model"
 )
 
@@ -26,21 +27,32 @@ type Store struct {
 	eventC   chan model.AuditEvent
 	lastHash string
 	maxAge   time.Duration
+	syslog   *syslogWriter
 	done     chan struct{}
 	wg       sync.WaitGroup
 }
 
 // NewStore creates a new audit store.
-func NewStore(dir string, maxAge time.Duration) (*Store, error) {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+func NewStore(cfg config.AuditConfig) (*Store, error) {
+	if err := os.MkdirAll(cfg.Directory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create audit directory: %w", err)
 	}
 
 	s := &Store{
-		dir:    dir,
+		dir:    cfg.Directory,
 		eventC: make(chan model.AuditEvent, 1000),
-		maxAge: maxAge,
+		maxAge: cfg.Retention,
 		done:   make(chan struct{}),
+	}
+
+	// Initialize Syslog if enabled
+	if cfg.Syslog.Enabled {
+		sw, err := newSyslogWriter(cfg.Syslog)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Syslog: %v", err)
+		} else {
+			s.syslog = sw
+		}
 	}
 
 	// Initialize lastHash from the latest file
@@ -223,6 +235,13 @@ func (s *Store) writeEvent(event model.AuditEvent) (err error) {
 	// Critical for production: Ensure data is physically on disk
 	if err := f.Sync(); err != nil {
 		return fmt.Errorf("failed to sync audit log to disk: %w", err)
+	}
+
+	// 5. Send to Syslog/SIEM if enabled
+	if s.syslog != nil {
+		if err := s.syslog.Write(event); err != nil {
+			log.Printf("Warning: Failed to send audit event to Syslog: %v", err)
+		}
 	}
 
 	return nil

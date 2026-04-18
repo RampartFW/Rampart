@@ -6,15 +6,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/rampartfw/rampart/internal/api"
 	"github.com/rampartfw/rampart/internal/audit"
 	"github.com/rampartfw/rampart/internal/backend"
+	"github.com/rampartfw/rampart/internal/cluster"
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/engine"
 	"github.com/rampartfw/rampart/internal/logger"
+	"github.com/rampartfw/rampart/internal/mcp"
 	"github.com/rampartfw/rampart/internal/snapshot"
 )
 
@@ -74,7 +77,7 @@ func (c *ServeCommand) Run(args []string) {
 	log.Info("Backend initialized", "type", b.Name())
 
 	// 4. Initialize stores
-	auditStore, err := audit.NewStore(cfg.Audit.Directory, cfg.Audit.Retention)
+	auditStore, err := audit.NewStore(cfg.Audit)
 	if err != nil {
 		log.Error("Failed to initialize audit store", "error", err)
 		os.Exit(1)
@@ -106,6 +109,10 @@ func (c *ServeCommand) Run(args []string) {
 	sched := engine.NewScheduler(eng, cfg.Scheduler.CheckInterval)
 	go sched.Run(context.Background())
 	log.Info("Scheduler started", "interval", cfg.Scheduler.CheckInterval)
+
+	// Start Watchdog for backend self-healing (T-059)
+	go eng.StartWatchdog(context.Background(), 1*time.Minute)
+	log.Info("Backend watchdog started")
 
 	// 6. Initialize Cluster (Raft)
 	var raftNode *cluster.RaftNode
@@ -157,6 +164,17 @@ func (c *ServeCommand) Run(args []string) {
 	// 7. Initialize API server
 	srv := api.NewServer(cfg, eng, snapshotStore, auditStore, raftNode)
 
+	// Start MCP Server if enabled (T-045)
+	if os.Getenv("RAMPART_MCP_ENABLED") == "true" {
+		mcpSrv := mcp.NewServer(eng, snapshotStore, auditStore)
+		go func() {
+			log.Info("Starting MCP Server (stdio)")
+			if err := mcpSrv.Run(context.Background(), os.Stdin, os.Stdout); err != nil {
+				log.Error("MCP Server error", "error", err)
+			}
+		}()
+	}
+
 	httpServer := &http.Server{
 		Addr:    cfg.Server.Listen,
 		Handler: srv,
@@ -205,14 +223,14 @@ func (c *ServeCommand) Run(args []string) {
 	}
 
 	// 10. Graceful shutdown
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
 	if raftNode != nil {
 		raftNode.Close()
 	}
 
-	if err := httpServer.Shutdown(ctx); err != nil {
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Error("Server forced to shutdown", "error", err)
 	}
 

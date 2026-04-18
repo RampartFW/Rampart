@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -101,4 +100,11 @@ func (c *ClusterCommand) runStatus(args []string) {
 	)
 	w.Flush()
 	fmt.Println()
+}
+
+func (c *ClusterCommand) usage() {
+	fmt.Println("Usage: rampart cluster <subcommand> [arguments]")
+	fmt.Println("\nSubcommands:")
+	fmt.Println("  status      Show cluster status")
+	fmt.Println("  init/join   Managed via configuration and 'rampart serve'")
 }

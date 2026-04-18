@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,7 +11,41 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var varPattern = regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
+var (
+	varPattern     = regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
+	dynamicPattern = regexp.MustCompile(`\$\{([a-z0-9]+):([^}]+)\}`)
+)
+
+// DynamicResolver defines the interface for sources that can resolve variables at runtime.
+type DynamicResolver interface {
+	Name() string
+	Resolve(ctx context.Context, query string) ([]string, error)
+}
+
+var resolvers = make(map[string]DynamicResolver)
+
+// RegisterResolver adds a new dynamic resolver to the engine.
+func RegisterResolver(r DynamicResolver) {
+	resolvers[r.Name()] = r
+}
+
+// ResolveDynamicVars processes strings like ${k8s:app=frontend} into actual values.
+func ResolveDynamicVars(ctx context.Context, input string) ([]string, error) {
+	match := dynamicPattern.FindStringSubmatch(input)
+	if match == nil {
+		return []string{input}, nil
+	}
+
+	source := match[1]
+	query := match[2]
+
+	resolver, ok := resolvers[source]
+	if !ok {
+		return nil, fmt.Errorf("unknown dynamic source: %s", source)
+	}
+
+	return resolver.Resolve(ctx, query)
+}
 
 // ParseVariablesFile parses a rampart-vars.yaml file.
 func ParseVariablesFile(path string) (map[string]interface{}, error) {

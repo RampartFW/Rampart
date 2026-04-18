@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -20,8 +21,23 @@ func Register(name string, factory BackendFactory) {
 	registry[name] = factory
 }
 
-// NewBackend creates a new backend by name
+// NewBackend creates a new backend by name. 
+// Supports comma-separated names for multi-backend fan-out (e.g. "nftables,aws").
 func NewBackend(name string, cfg BackendConfig) (Backend, error) {
+	if strings.Contains(name, ",") {
+		names := strings.Split(name, ",")
+		var backends []Backend
+		for _, n := range names {
+			n = strings.TrimSpace(n)
+			b, err := NewBackend(n, cfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create sub-backend %s: %w", n, err)
+			}
+			backends = append(backends, b)
+		}
+		return NewMultiBackend(backends...), nil
+	}
+
 	mu.RLock()
 	factory, ok := registry[name]
 	mu.RUnlock()
@@ -34,15 +50,11 @@ func NewBackend(name string, cfg BackendConfig) (Backend, error) {
 // AutoDetect probes for the best available backend
 func AutoDetect() (Backend, error) {
 	// 1. Try to initialize Hybrid (eBPF for fast path + nftables for slow path)
-	nft, _ := NewBackend("nftables", BackendConfig{Type: "nftables"})
-	ebpf, _ := NewBackend("ebpf", BackendConfig{Type: "ebpf"})
+	nft, err1 := NewBackend("nftables", BackendConfig{Type: "nftables"})
+	ebpf, err2 := NewBackend("ebpf", BackendConfig{Type: "ebpf"})
 
-	if nft != nil && ebpf != nil && nft.Probe() == nil && ebpf.Probe() == nil {
+	if err1 == nil && err2 == nil && nft.Probe() == nil && ebpf.Probe() == nil {
 		// Both supported! Create hybrid. 
-		// We need to import hybrid or handle it here.
-		// For now, if both exist, we could return a hybrid implementation.
-		// Since registry doesn't know about 'ebpf' package's HybridBackend directly,
-		// we will look for a registered "hybrid" backend or fall back.
 		if factory, ok := registry["hybrid"]; ok {
 			return factory(BackendConfig{Type: "hybrid"})
 		}

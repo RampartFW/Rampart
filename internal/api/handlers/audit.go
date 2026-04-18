@@ -53,6 +53,19 @@ func (h *AuditHandler) HandleList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *AuditHandler) HandleVerify(w http.ResponseWriter, r *http.Request) {
+	valid, err := h.store.VerifyIntegrity()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"valid": valid,
+		"timestamp": time.Now(),
+	})
+}
+
 func (h *AuditHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	params := Params(r)
 	id := params["id"]

@@ -95,11 +95,19 @@ type AutoSnapshotConfig struct {
 	Interval time.Duration `yaml:"interval"`
 	PreApply bool          `yaml:"preApply"`
 }
-
 type AuditConfig struct {
 	Directory string        `yaml:"directory"`
 	Retention time.Duration `yaml:"retention"`
 	Compress  bool          `yaml:"compress"`
+	Syslog    SyslogConfig  `yaml:"syslog,omitempty"`
+}
+
+type SyslogConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Network  string `yaml:"network,omitempty"` // "udp", "tcp", or "" for local
+	Address  string `yaml:"address,omitempty"` // "localhost:514"
+	Tag      string `yaml:"tag,omitempty"`
+	Priority string `yaml:"priority,omitempty"` // "info", "notice", etc.
 }
 
 type SchedulerConfig struct {

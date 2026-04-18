@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 
 	"github.com/rampartfw/rampart/internal/backend"
 	"github.com/rampartfw/rampart/internal/engine"
@@ -29,6 +30,8 @@ func (f *PolicyFSM) Apply(entry model.LogEntry) error {
 	switch entry.Type {
 	case model.EntryPolicyUpdate:
 		return f.applyPolicyUpdate(entry.Data)
+	case model.EntryIPBan:
+		return f.applyIPBan(entry.Data)
 	case model.EntryConfigChange:
 		// Handle config change
 		return nil
@@ -38,6 +41,39 @@ func (f *PolicyFSM) Apply(entry model.LogEntry) error {
 	default:
 		return fmt.Errorf("unknown entry type: %s", entry.Type)
 	}
+}
+
+func (f *PolicyFSM) applyIPBan(data []byte) error {
+	var ip string
+	if err := json.Unmarshal(data, &ip); err != nil {
+		return fmt.Errorf("failed to unmarshal IP ban: %w", err)
+	}
+
+	// 1. Add to in-memory ruleset as a high-priority block rule
+	current := f.engine.CurrentRules()
+	if current == nil {
+		current = &model.CompiledRuleSet{}
+	}
+
+	// Create a dynamic block rule
+	banRule := model.CompiledRule{
+		ID:        fmt.Sprintf("ips-ban-%s", ip),
+		Name:      fmt.Sprintf("IPS Auto-Ban: %s", ip),
+		Priority:  -100, // Very high priority
+		Action:    model.ActionDrop,
+		Direction: model.DirectionInbound,
+		Match: model.CompiledMatch{
+			SourceNets: []net.IPNet{
+				{IP: net.ParseIP(ip), Mask: net.CIDRMask(32, 32)},
+			},
+		},
+	}
+
+	current.Rules = append([]model.CompiledRule{banRule}, current.Rules...)
+	f.engine.SetRules(current)
+
+	// 2. Re-apply to backend
+	return f.engine.ReapplyRules(context.Background())
 }
 
 func (f *PolicyFSM) applyPolicyUpdate(data []byte) error {

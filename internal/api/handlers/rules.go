@@ -154,6 +154,34 @@ func (h *RulesHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"id": id})
 }
 
+func (h *RulesHandler) HandleImpact(w http.ResponseWriter, r *http.Request) {
+	params := Params(r)
+	id := params["id"]
+	if id == "" {
+		respondError(w, http.StatusBadRequest, "Missing rule ID")
+		return
+	}
+
+	current := h.engine.CurrentRules()
+	if current == nil {
+		respondError(w, http.StatusNotFound, "Ruleset empty")
+		return
+	}
+
+	conflicts := engine.DetectConflicts(current.Rules)
+	var ruleConflicts []model.Conflict
+	for _, c := range conflicts {
+		if c.RuleA.ID == id || c.RuleB.ID == id {
+			ruleConflicts = append(ruleConflicts, c)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"ruleID":    id,
+		"conflicts": ruleConflicts,
+	})
+}
+
 func (h *RulesHandler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.engine.Backend().Stats(r.Context())
 	if err != nil {

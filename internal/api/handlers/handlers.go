@@ -3,7 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/rampartfw/rampart/internal/model"
 )
+
+type RaftNode interface {
+	Propose(entryType model.EntryType, data []byte) error
+	Status() model.NodeStatus
+}
 
 type contextKey string
 

@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/rampartfw/rampart/internal/api/handlers"
+	"github.com/rampartfw/rampart/internal/audit"
+	"github.com/rampartfw/rampart/internal/cluster"
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/engine"
 	"github.com/rampartfw/rampart/internal/snapshot"
-	"github.com/rampartfw/rampart/internal/audit"
 )
 
 //go:embed ui/dist/*

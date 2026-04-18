@@ -8,11 +8,8 @@ import (
 
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/engine"
+	"github.com/rampartfw/rampart/internal/model"
 )
-
-type RaftNode interface {
-	Status() model.NodeStatus
-}
 
 type SystemHandler struct {
 	cfg       *config.Config

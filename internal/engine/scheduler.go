@@ -2,7 +2,7 @@ package engine
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/rampartfw/rampart/internal/model"
@@ -94,33 +94,34 @@ func (s *Scheduler) Run(ctx context.Context) {
 }
 
 func (s *Scheduler) evaluate() {
-	now := time.Now()
-	
-	changed := false
+	triggerReapply := false
 	rs := s.engine.CurrentRules()
 	if rs == nil {
 		return
 	}
 
-	// In a real implementation, we'd check if any rule's active state
-	// has changed since the last run. For simplicity, we trigger a reapply
-	// if we find a rule that *has* a schedule, to ensure accuracy.
-	// For "Production Ready", we should only reapply if a transition occurred.
-	
+	// 1. Check time-based schedules
+	now := time.Now()
 	for _, rule := range rs.Rules {
 		if rule.Schedule != nil {
-			// This is a simplified check. A production scheduler would
-			// track state transitions for each rule.
-			changed = true
-			break
+			if IsActive(rule.Schedule, now) {
+				// Simplified check for demo
+				triggerReapply = true
+				break
+			}
 		}
 	}
 
-	if changed {
-		// Re-evaluate and re-apply rules to the backend
-		// This will filter out inactive rules during the next backend Apply
+	// 2. Check dynamic IP sets (e.g. K8s pod changes)
+	// In a real implementation, we'd cache the previous results of ResolveDynamicVars
+	// and only trigger reapply if the IP list has changed.
+	// For production readiness, per-second polling is heavy, so we would use 
+	// K8s Watch API or a longer interval.
+	
+	if triggerReapply {
+		log.Printf("Scheduler: triggering dynamic rule reapply")
 		if err := s.engine.ReapplyRules(context.Background()); err != nil {
-			fmt.Printf("Scheduler: failed to reapply rules: %v\n", err)
+			log.Printf("Scheduler: failed to reapply rules: %v", err)
 		}
 	}
 }

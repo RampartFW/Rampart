@@ -111,28 +111,55 @@ func (b *EBPFBackend) Apply(ctx context.Context, rs *model.CompiledRuleSet) erro
 }
 
 func (b *EBPFBackend) createMaps() error {
-	// LPM Trie for CIDRs
-	// Key: [prefix_len(4) + ip(4 or 16)]
+	// 1. LPM Trie for CIDRs
 	fd, err := b.createMap(unix.BPF_MAP_TYPE_LPM_TRIE, 8, 4, 4096, unix.BPF_F_NO_PREALLOC)
 	if err != nil {
 		return err
 	}
 	b.maps["blocked_cidrs"] = fd
 
-	// Hash map for ports
+	// 2. Program Array for Tail Calls (Performance Hardening T-050)
+	// This allows jumping between BPF programs to handle complex rule logic
+	fd, err = b.createMap(unix.BPF_MAP_TYPE_PROG_ARRAY, 4, 4, 64, 0)
+	if err != nil {
+		return err
+	}
+	b.maps["jump_table"] = fd
+
+	// 3. Hash map for ports
 	fd, err = b.createMap(unix.BPF_MAP_TYPE_HASH, 2, 4, 1024, 0)
 	if err != nil {
 		return err
 	}
 	b.maps["allowed_ports"] = fd
 
-	// Percpu array for stats
+	// 4. Percpu array for stats
 	fd, err = b.createMap(unix.BPF_MAP_TYPE_PERCPU_ARRAY, 4, 16, 4096, 0)
 	if err != nil {
 		return err
 	}
 	b.maps["rule_stats"] = fd
 
+	return nil
+}
+
+func (b *EBPFBackend) updateJumpTable(index uint32, progFd int) error {
+	attr := struct {
+		mapFd uint32
+		key   uintptr
+		value uintptr
+		flags uint64
+	}{
+		mapFd: uint32(b.maps["jump_table"]),
+		key:   uintptr(unsafe.Pointer(&index)),
+		value: uintptr(unsafe.Pointer(&progFd)),
+		flags: 0,
+	}
+
+	_, _, errno := unix.Syscall(unix.SYS_BPF, unix.BPF_MAP_UPDATE_ELEM, uintptr(unsafe.Pointer(&attr)), unsafe.Sizeof(attr))
+	if errno != 0 {
+		return errno
+	}
 	return nil
 }
 

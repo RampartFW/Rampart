@@ -21,6 +21,20 @@ func NewHybridBackend(fast, slow backend.Backend) *HybridBackend {
 	}
 }
 
+func init() {
+	backend.Register("hybrid", func(cfg backend.BackendConfig) (backend.Backend, error) {
+		nft, err := backend.NewBackend("nftables", backend.BackendConfig{Type: "nftables"})
+		if err != nil {
+			return nil, err
+		}
+		ebpf, err := backend.NewBackend("ebpf", backend.BackendConfig{Type: "ebpf"})
+		if err != nil {
+			return nil, err
+		}
+		return NewHybridBackend(ebpf, nft), nil
+	})
+}
+
 func (b *HybridBackend) Name() string {
 	return fmt.Sprintf("hybrid(%s+%s)", b.fastPath.Name(), b.slowPath.Name())
 }

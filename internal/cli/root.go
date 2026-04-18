@@ -8,6 +8,13 @@ import (
 
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/engine"
+
+	_ "github.com/rampartfw/rampart/internal/backend/aws"
+	_ "github.com/rampartfw/rampart/internal/backend/azure"
+	_ "github.com/rampartfw/rampart/internal/backend/ebpf"
+	_ "github.com/rampartfw/rampart/internal/backend/gcp"
+	_ "github.com/rampartfw/rampart/internal/backend/iptables"
+	_ "github.com/rampartfw/rampart/internal/backend/nftables"
 )
 
 // Global flags
@@ -102,20 +109,15 @@ func LoadVars() map[string]interface{} {
 }
 
 var subcommands = []Subcommand{
-	&AgentCommand{},
 	&ApplyCommand{},
 	&AuditCommand{},
 	&CertCommand{},
 	&ClusterCommand{},
-	&DiffCommand{},
-	&ExportCommand{},
 	&FmtCommand{},
-	&ImportCommand{},
 	&PlanCommand{},
 	&RollbackCommand{},
 	&RulesCommand{},
 	&ServeCommand{},
-	&SimulateCommand{},
 	&SnapshotCommand{},
 	&ValidateCommand{},
 	&VersionCommand{},

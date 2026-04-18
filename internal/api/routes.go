@@ -31,6 +31,7 @@ func (s *Server) routes() {
 	s.router.Handle("GET", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleList)).ServeHTTP)
 	s.router.Handle("POST", "/api/v1/rules", apiAuth(http.HandlerFunc(rh.HandleAdd)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/rules/:id", apiAuth(http.HandlerFunc(rh.HandleGet)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/rules/:id/impact", apiAuth(http.HandlerFunc(rh.HandleImpact)).ServeHTTP)
 	s.router.Handle("DELETE", "/api/v1/rules/:id", apiAuth(http.HandlerFunc(rh.HandleDelete)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/rules/:id/stats", apiAuth(http.HandlerFunc(rh.HandleStats)).ServeHTTP)
 
@@ -46,6 +47,7 @@ func (s *Server) routes() {
 	// Audit handlers
 	ah := handlers.NewAuditHandler(s.auditStore)
 	s.router.Handle("GET", "/api/v1/audit", apiAuth(http.HandlerFunc(ah.HandleList)).ServeHTTP)
+	s.router.Handle("GET", "/api/v1/audit/verify", apiAuth(http.HandlerFunc(ah.HandleVerify)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/audit/:id", apiAuth(http.HandlerFunc(ah.HandleGet)).ServeHTTP)
 	s.router.Handle("GET", "/api/v1/audit/search", apiAuth(http.HandlerFunc(ah.HandleSearch)).ServeHTTP)
 

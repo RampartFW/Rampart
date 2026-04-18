@@ -19,6 +19,7 @@ const (
 	EntryConfigChange EntryType = "ConfigChange"
 	EntryNodeJoin     EntryType = "NodeJoin"
 	EntryNodeLeave    EntryType = "NodeLeave"
+	EntryIPBan        EntryType = "IPBan"
 )
 
 // LogEntry is a single entry in the Raft log.

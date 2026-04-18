@@ -85,9 +85,23 @@ func validateMatch(m *model.MatchYAML) error {
 	}
 
 	// Protocol validation
-	proto := strings.ToLower(m.Protocol)
-	if proto != "" && proto != "tcp" && proto != "udp" && proto != "icmp" && proto != "icmpv6" && proto != "any" {
-		return fmt.Errorf("invalid protocol: %s", m.Protocol)
+	if m.Protocol != nil {
+		switch p := m.Protocol.(type) {
+		case string:
+			proto := strings.ToLower(p)
+			if proto != "" && proto != "tcp" && proto != "udp" && proto != "icmp" && proto != "icmpv6" && proto != "any" {
+				return fmt.Errorf("invalid protocol: %s", p)
+			}
+		case []string:
+			for _, protoStr := range p {
+				proto := strings.ToLower(protoStr)
+				if proto != "tcp" && proto != "udp" && proto != "icmp" && proto != "icmpv6" {
+					return fmt.Errorf("invalid protocol in list: %s", protoStr)
+				}
+			}
+		default:
+			return fmt.Errorf("protocol must be a string or a list of strings")
+		}
 	}
 
 	return nil

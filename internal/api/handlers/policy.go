@@ -10,10 +10,6 @@ import (
 	"github.com/rampartfw/rampart/internal/model"
 )
 
-type RaftNode interface {
-	Propose(entryType model.EntryType, data []byte) error
-}
-
 type PolicyHandler struct {
 	engine        *engine.Engine
 	snapshotStore *snapshot.Store

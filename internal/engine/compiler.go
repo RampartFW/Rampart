@@ -15,6 +15,11 @@ import (
 
 // Compile transforms a PolicySetYAML into a CompiledRuleSet.
 func Compile(ps *model.PolicySetYAML, vars map[string]interface{}) (*model.CompiledRuleSet, error) {
+	// 0. Perform deep validation first
+	if err := ValidatePolicySet(ps); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	// 1. Resolve includes (should have been done by caller or here)
 	// For now, assume ps is already resolved as per parser/validator usage.
 

@@ -1,7 +1,7 @@
 # Rampart — Implementation Guide
 
-> **Version:** 1.0.0-draft  
-> **Companion to:** Rampart SPECIFICATION.md v1.0.0-draft  
+> **Version:** 0.1.0  
+> **Companion to:** Rampart SPECIFICATION.md v0.1.0  
 > **Scope:** Phase 1–3 MVP (Core Engine + iptables + API + WebUI)  
 > **Estimated LOC:** ~12,000 Go + ~8,000 TypeScript/React  
 > **Timeline:** 8 weeks

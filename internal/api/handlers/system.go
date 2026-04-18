@@ -39,7 +39,7 @@ func (h *SystemHandler) HandleClusterStatus(w http.ResponseWriter, r *http.Reque
 
 func (h *SystemHandler) HandleInfo(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
-		"version": "1.0.0-draft",
+		"version": "0.1.0",
 		"go_version": runtime.Version(),
 		"arch":      runtime.GOARCH,
 		"os":        runtime.GOOS,

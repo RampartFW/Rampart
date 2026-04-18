@@ -108,7 +108,7 @@ const Hero = () => {
           >
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest mb-6">
               <Zap className="w-3 h-3 fill-current" />
-              v1.0.0 Now Production Ready
+              v0.1.0 Now Production Ready
             </span>
             <h1 className="text-5xl md:text-7xl font-extrabold mb-8 tracking-tight leading-tight">
               Autonomous Network <br />

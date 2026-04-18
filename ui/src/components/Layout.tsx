@@ -97,7 +97,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Node node-1 (L)</span>
              </div>
-             <p className="text-[10px] text-zinc-500 mt-1 font-mono">v1.0.0-production</p>
+             <p className="text-[10px] text-zinc-500 mt-1 font-mono">v0.1.0-production</p>
           </div>
         </div>
       </aside>

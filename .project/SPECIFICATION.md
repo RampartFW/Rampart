@@ -1,6 +1,6 @@
 # Rampart — Technical Specification
 
-> **Version:** 1.0.0-draft  
+> **Version:** 0.1.0  
 > **Status:** Design Phase  
 > **Language:** Go 1.23+  
 > **Dependencies:** Zero (stdlib + golang.org/x/crypto, golang.org/x/sys, gopkg.in/yaml.v3 only)  

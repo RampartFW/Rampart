@@ -1,6 +1,6 @@
 # Rampart — Task Breakdown
 
-> **Version:** 1.0.0-draft  
+> **Version:** 0.1.0  
 > **Date:** 2026-04-11  
 > **Scope:** Full implementation (Phase 1–7)  
 > **Companion to:** SPECIFICATION.md + IMPLEMENTATION.md  

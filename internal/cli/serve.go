@@ -41,7 +41,7 @@ func (c *ServeCommand) Run(args []string) {
 	}
 	log := logger.Component("cli")
 
-	log.Info("Starting Rampart server", "version", "1.0.0")
+	log.Info("Starting Rampart server", "version", "0.1.0")
 
 	// 3. Initialize backend
 	var b backend.Backend

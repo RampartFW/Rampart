@@ -1,0 +1,59 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Set up Go ⚙️
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Set up Node.js ⚙️
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build Web UI 🔧
+        run: |
+          cd ui
+          npm ci
+          npm run build
+
+      - name: Build Binary 🔨
+        run: |
+          BINARY_NAME=rampart-${{ matrix.goos }}-${{ matrix.goarch }}
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -ldflags="-s -w" -o $BINARY_NAME ./cmd/rampart
+          echo "BINARY_PATH=$BINARY_NAME" >> $GITHUB_ENV
+
+      - name: Upload Release Asset 📤
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.BINARY_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -16,6 +16,7 @@ import (
 	"github.com/rampartfw/rampart/internal/cluster"
 	"github.com/rampartfw/rampart/internal/config"
 	"github.com/rampartfw/rampart/internal/engine"
+	"github.com/rampartfw/rampart/internal/k8s"
 	"github.com/rampartfw/rampart/internal/logger"
 	"github.com/rampartfw/rampart/internal/mcp"
 	"github.com/rampartfw/rampart/internal/snapshot"
@@ -174,6 +175,19 @@ func (c *ServeCommand) Run(args []string) {
 			}
 		}()
 	}
+
+	// Start K8s Controller if enabled (T-060)
+	if os.Getenv("RAMPART_K8S_ENABLED") == "true" {
+		k8sCtrl, err := k8s.NewController(eng)
+		if err != nil {
+			log.Error("Failed to initialize K8s controller", "error", err)
+		} else {
+			go k8sCtrl.Run(context.Background())
+		}
+	}
+
+	// 7. Initialize API server
+	srv = api.NewServer(cfg, eng, snapshotStore, auditStore, raftNode)
 
 	httpServer := &http.Server{
 		Addr:    cfg.Server.Listen,

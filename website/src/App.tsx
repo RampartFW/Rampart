@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import { 
   Shield, Cpu, Cloud, Zap, Lock, Menu, X, ChevronRight, GitBranch, 
   Terminal, Globe, Bot, RefreshCw, Search, CheckCircle2, 
@@ -39,31 +39,27 @@ const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 }
 
 // --- Shared Components ---
-const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'outline' | 'ghost', size?: 'default' | 'lg' | 'icon' }>(
-  ({ className, variant = 'default', size = 'default', ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-          {
-            "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md": variant === 'default',
-            "border border-input bg-background hover:bg-accent hover:text-accent-foreground": variant === 'outline',
-            "hover:bg-accent hover:text-accent-foreground": variant === 'ghost',
-            "h-10 px-4 py-2": size === 'default',
-            "h-12 rounded-md px-8 text-base": size === 'lg',
-            "h-10 w-10": size === 'icon',
-          },
-          className
-        )}
-        {...props}
-      />
-    )
-  }
-)
-Button.displayName = "Button"
+const Button = ({ className, variant = 'default', size = 'default', ...props }: any) => {
+  return (
+    <button
+      className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        {
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md": variant === 'default',
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground": variant === 'outline',
+          "hover:bg-accent hover:text-accent-foreground": variant === 'ghost',
+          "h-10 px-4 py-2": size === 'default',
+          "h-12 rounded-md px-8 text-base": size === 'lg',
+          "h-10 w-10": size === 'icon',
+        },
+        className
+      )}
+      {...props}
+    />
+  )
+}
 
-const Badge = ({ className, variant = "default", ...props }: React.HTMLAttributes<HTMLDivElement> & { variant?: "default" | "secondary" | "outline" }) => (
+const Badge = ({ className, variant = "default", ...props }: any) => (
   <div className={cn(
     "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
     {
@@ -118,7 +114,7 @@ const Navbar = () => {
           </Button>
           <a href="https://github.com/ersinkoc/Rampart" target="_blank" rel="noreferrer">
             <Button variant="outline" size="sm" className="gap-2">
-              <Github className="w-4 h-4" /> GitHub
+              <GitBranch className="w-4 h-4" /> GitHub
             </Button>
           </a>
         </div>
@@ -159,8 +155,8 @@ const Hero = () => {
     <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
       <div className={cn("absolute inset-0 pointer-events-none opacity-50", isDark ? "glow-hero-dark" : "glow-hero-light")} />
       
-      <div className="container mx-auto px-4 md:px-8 relative z-10">
-        <div className="max-w-4xl mx-auto text-center">
+      <div className="container mx-auto px-4 md:px-8 relative z-10 text-center">
+        <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <Badge variant="secondary" className="mb-6 py-1 px-3 gap-1 border-primary/20 text-primary">
               <Zap className="w-3 h-3" /> v0.1.0 Initial Beta is Live
@@ -183,7 +179,7 @@ const Hero = () => {
               </a>
               <a href="https://github.com/ersinkoc/Rampart" target="_blank" rel="noreferrer">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2 font-semibold">
-                  <Terminal className="w-4 h-4" /> View Documentation
+                  <GitBranch className="w-4 h-4" /> View Source
                 </Button>
               </a>
             </div>
@@ -202,7 +198,7 @@ const Hero = () => {
             </div>
             <span className="ml-2 text-xs font-mono text-muted-foreground">policy.yaml</span>
           </div>
-          <div className="p-6 md:p-8 font-mono text-sm md:text-base bg-[#0d1117] text-[#c9d1d9] overflow-x-auto">
+          <div className="p-6 md:p-8 font-mono text-sm md:text-base bg-[#0d1117] text-[#c9d1d9] text-left overflow-x-auto">
             <pre className="leading-loose">
               <code>
 <span className="text-[#ff7b72]">apiVersion</span>: <span className="text-[#a5d6ff]">rampartfw.com/v1</span>{`\n`}

@@ -3,7 +3,6 @@
 @theme {
   --color-brand: #3b82f6;
   --color-brand-foreground: #ffffff;
-  
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
@@ -54,20 +53,29 @@
 
 @layer base {
   * {
-    @apply border-zinc-800;
+    @apply border-zinc-200 dark:border-zinc-800 transition-colors duration-200;
   }
   body {
-    @apply bg-zinc-950 text-slate-50;
+    @apply bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 .glass {
-  background: rgba(9, 9, 11, 0.7);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .glass {
+  background: rgba(9, 9, 11, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .hero-gradient {
+  background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+.dark .hero-gradient {
   background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.15) 0%, rgba(9, 9, 11, 0) 70%);
 }

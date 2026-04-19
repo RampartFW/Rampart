@@ -1,24 +1,23 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import React, { useState, useEffect, createContext, useContext } from 'react'
 import { 
-  Shield, Cpu, Cloud, Zap, Lock, Menu, X, ChevronRight, Github, 
-  Terminal, Activity, Globe, Bot, RefreshCw, Search, CheckCircle2, 
-  Sun, Moon, Book, Code2, Layers, ArrowRight, Download, ExternalLink,
-  ChevronDown, FileCode, Box, Server, Network, Command, Database, Fingerprint
+  Shield, Cpu, Cloud, Zap, Lock, Menu, X, ChevronRight, GitBranch, 
+  Terminal, Globe, Bot, RefreshCw, Search, CheckCircle2, 
+  Sun, Moon, Layers, ArrowRight, Download, TerminalSquare,
+  Server, Network, Database
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { cn } from './lib/utils'
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
+// --- Theme Management ---
 const ThemeContext = createContext({ isDark: true, toggle: () => {} })
 
 const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [isDark, setIsDark] = useState(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('rampart-theme') : 'dark'
-    return saved === 'dark'
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rampart-theme')
+      return saved ? saved === 'dark' : true
+    }
+    return true
   })
 
   useEffect(() => {
@@ -39,6 +38,44 @@ const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   )
 }
 
+// --- Shared Components ---
+const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'outline' | 'ghost', size?: 'default' | 'lg' | 'icon' }>(
+  ({ className, variant = 'default', size = 'default', ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        className={cn(
+          "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          {
+            "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md": variant === 'default',
+            "border border-input bg-background hover:bg-accent hover:text-accent-foreground": variant === 'outline',
+            "hover:bg-accent hover:text-accent-foreground": variant === 'ghost',
+            "h-10 px-4 py-2": size === 'default',
+            "h-12 rounded-md px-8 text-base": size === 'lg',
+            "h-10 w-10": size === 'icon',
+          },
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+
+const Badge = ({ className, variant = "default", ...props }: React.HTMLAttributes<HTMLDivElement> & { variant?: "default" | "secondary" | "outline" }) => (
+  <div className={cn(
+    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+    {
+      "border-transparent bg-primary text-primary-foreground": variant === "default",
+      "border-transparent bg-secondary text-secondary-foreground": variant === "secondary",
+      "text-foreground": variant === "outline",
+    },
+    className
+  )} {...props} />
+)
+
+// --- Sections ---
 const Navbar = () => {
   const { isDark, toggle } = useContext(ThemeContext)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -50,78 +87,303 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  const navLinks = [
+    { name: 'Features', href: '#features' },
+    { name: 'Docs', href: '#docs' },
+    { name: 'Releases', href: '#releases' },
+  ]
+
   return (
-    <nav className={cn(
-      "fixed top-0 left-0 right-0 z-[60] transition-all duration-500",
-      isScrolled ? "glass border-b border-zinc-200/50 dark:border-white/5 py-4 shadow-2xl" : "bg-transparent py-8"
+    <header className={cn(
+      "fixed top-0 w-full z-50 transition-all duration-300 border-b",
+      isScrolled ? "bg-background/80 backdrop-blur-md border-border shadow-sm" : "bg-transparent border-transparent"
     )}>
-      <div className="container mx-auto px-8 flex items-center justify-between">
-        <div className="flex items-center gap-4 group cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-          <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center shadow-xl shadow-blue-500/30">
-            <Shield className="text-white w-6 h-6" />
-          </div>
-          <span className="text-2xl font-black tracking-tighter dark:text-white text-zinc-950">RAMPART</span>
+      <div className="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+          <Shield className="w-6 h-6 text-primary" />
+          <span className="font-bold tracking-tight text-lg">Rampart</span>
         </div>
 
-        <div className="hidden md:flex items-center gap-10">
-          {['Features', 'Documentation', 'Releases'].map(link => (
-            <a key={link} href={`#${link.toLowerCase().replace(' ', '-')}`} className="text-sm font-black text-zinc-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-white transition-all uppercase tracking-widest">
-              {link}
+        <nav className="hidden md:flex items-center gap-6">
+          {navLinks.map(link => (
+            <a key={link.name} href={link.href} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              {link.name}
             </a>
           ))}
-          <button onClick={toggle} className="w-10 h-10 rounded-xl flex items-center justify-center bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 hover:border-blue-500/50 transition-all">
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-600" />}
-          </button>
-          <a href="https://github.com/ersinkoc/Rampart" className="bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 px-6 py-2.5 rounded-xl text-sm font-black transition-all hover:scale-105 shadow-xl">
-            GitHub
+        </nav>
+
+        <div className="hidden md:flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={toggle} className="text-muted-foreground">
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
+          <a href="https://github.com/ersinkoc/Rampart" target="_blank" rel="noreferrer">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Github className="w-4 h-4" /> GitHub
+            </Button>
           </a>
         </div>
-        <button className="md:hidden glass p-2 rounded-xl" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
+
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </Button>
       </div>
-    </nav>
+
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="md:hidden absolute top-16 left-0 w-full bg-background border-b border-border shadow-lg p-4 flex flex-col gap-4"
+          >
+            {navLinks.map(link => (
+              <a key={link.name} href={link.href} className="text-sm font-medium p-2 hover:bg-accent rounded-md" onClick={() => setIsMobileMenuOpen(false)}>
+                {link.name}
+              </a>
+            ))}
+            <div className="h-px bg-border my-2" />
+            <div className="flex items-center justify-between p-2">
+              <span className="text-sm font-medium">Theme</span>
+              <Button variant="ghost" size="icon" onClick={toggle}>
+                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </header>
   )
 }
 
-const CodePreview = () => (
-  <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 1 }} className="mt-32 max-w-5xl mx-auto glass rounded-[3rem] overflow-hidden shadow-2xl border-zinc-200 dark:border-white/10">
-    <div className="bg-zinc-100/80 dark:bg-zinc-900/80 px-8 py-5 border-b border-zinc-200 dark:border-white/10 flex items-center justify-between">
-      <div className="flex gap-2.5"><div className="w-3.5 h-3.5 rounded-full bg-rose-500/40" /><div className="w-3.5 h-3.5 rounded-full bg-amber-500/40" /><div className="w-3.5 h-3.5 rounded-full bg-emerald-500/40" /></div>
-      <span className="text-[10px] font-black uppercase tracking-[0.4em] font-mono text-zinc-500">policy.yaml</span>
-      <div className="w-10" />
-    </div>
-    <div className="p-10 md:p-16 font-mono text-base md:text-lg text-left bg-white dark:bg-zinc-950/60">
-      <pre className="text-zinc-800 dark:text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre">
-        <code>{`apiVersion: rampartfw.com/v1\nkind: PolicySet\nmetadata:\n  name: "global-sentinel"\n\npolicies:\n  - name: "threat-mitigation"\n    rules:\n      - name: "block-malicious-dns"\n        action: drop\n        match:\n          appProtocol: dns\n          dns: { query: "attack.io" }`}</code>
-      </pre>
-    </div>
-  </motion.div>
-)
+const Hero = () => {
+  const { isDark } = useContext(ThemeContext)
+  return (
+    <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
+      <div className={cn("absolute inset-0 pointer-events-none opacity-50", isDark ? "glow-hero-dark" : "glow-hero-light")} />
+      
+      <div className="container mx-auto px-4 md:px-8 relative z-10">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <Badge variant="secondary" className="mb-6 py-1 px-3 gap-1 border-primary/20 text-primary">
+              <Zap className="w-3 h-3" /> v0.1.0 Initial Beta is Live
+            </Badge>
+            
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+              The Sovereign <br className="hidden md:block" />
+              <span className="text-primary">Defense Engine.</span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+              Stop managing firewall rules by hand. Rampart is a unified, autonomous policy engine for Linux eBPF, nftables, and Cloud Security Groups.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a href="#docs">
+                <Button size="lg" className="w-full sm:w-auto gap-2 font-semibold">
+                  Get Started <ChevronRight className="w-4 h-4" />
+                </Button>
+              </a>
+              <a href="https://github.com/ersinkoc/Rampart" target="_blank" rel="noreferrer">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2 font-semibold">
+                  <Terminal className="w-4 h-4" /> View Documentation
+                </Button>
+              </a>
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7 }}
+          className="mt-20 max-w-5xl mx-auto rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+        >
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/50">
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-rose-500/80" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+            </div>
+            <span className="ml-2 text-xs font-mono text-muted-foreground">policy.yaml</span>
+          </div>
+          <div className="p-6 md:p-8 font-mono text-sm md:text-base bg-[#0d1117] text-[#c9d1d9] overflow-x-auto">
+            <pre className="leading-loose">
+              <code>
+<span className="text-[#ff7b72]">apiVersion</span>: <span className="text-[#a5d6ff]">rampartfw.com/v1</span>{`\n`}
+<span className="text-[#ff7b72]">kind</span>: <span className="text-[#a5d6ff]">PolicySet</span>{`\n`}
+<span className="text-[#ff7b72]">metadata</span>:{`\n`}
+{`  `}<span className="text-[#79c0ff]">name</span>: <span className="text-[#a5d6ff]">"global-sentinel"</span>{`\n\n`}
+<span className="text-[#8b949e]"># Autonomous Security Logic</span>{`\n`}
+<span className="text-[#ff7b72]">policies</span>:{`\n`}
+{`  - `}<span className="text-[#79c0ff]">name</span>: <span className="text-[#a5d6ff]">"zero-trust-edge"</span>{`\n`}
+{`    `}<span className="text-[#79c0ff]">rules</span>:{`\n`}
+{`      - `}<span className="text-[#79c0ff]">name</span>: <span className="text-[#a5d6ff]">"mitigate-l7-threats"</span>{`\n`}
+{`        `}<span className="text-[#79c0ff]">action</span>: <span className="text-[#ff7b72] font-bold">drop</span>{`\n`}
+{`        `}<span className="text-[#79c0ff]">match</span>:{`\n`}
+{`          `}<span className="text-[#79c0ff]">appProtocol</span>: <span className="text-[#a5d6ff]">dns</span>{`\n`}
+{`          `}<span className="text-[#79c0ff]">dns</span>: <span className="text-[#c9d1d9]">{`{ query: "attack-source.com" }`}</span>
+              </code>
+            </pre>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+const Features = () => {
+  const items = [
+    { icon: Cpu, title: "eBPF/XDP Fast-Path", desc: "Native kernel execution with microsecond latency. Offload massive rule sets directly to the network driver." },
+    { icon: Bot, title: "Autonomous Sentinel", desc: "Beyond traditional IPS. Real-time threat scoring and automated cluster-wide mitigation powered by DPI signals." },
+    { icon: Cloud, title: "Unified Cloud Plane", desc: "Single control plane for AWS, GCP, and Azure. Synchronize security groups globally with one YAML manifest." },
+    { icon: RefreshCw, title: "Self-Healing Watchdog", desc: "Continuous drift detection. Rampart automatically audits and corrects firewall state to ensure 100% compliance." },
+    { icon: Lock, title: "mTLS Raft Cluster", desc: "Industrial Raft core ensures strong consistency and encrypted peer-to-peer security for your entire infrastructure." },
+    { icon: Search, title: "Layer-7 DPI Intelligence", desc: "Deep Packet Inspection for DNS, HTTP, and TLS SNI. Stop application-level threats before they enter your network." },
+  ]
+
+  return (
+    <section id="features" className="py-24 bg-muted/30 border-y border-border">
+      <div className="container mx-auto px-4 md:px-8">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Built for Resilience</h2>
+          <p className="text-muted-foreground text-lg">Traditional firewalls are static and complex. Rampart is dynamic, distributed, and aware.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+           {items.map((f, i) => (
+             <div key={i} className="p-6 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                   <f.icon className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+             </div>
+           ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 const Docs = () => {
-  const [tab, setTab] = useState(0)
-  const items = [
-    { title: 'Install', icon: Terminal, content: 'curl -sSL rampartfw.com/install | sh' },
-    { title: 'Raft', icon: Layers, content: 'Distributed consensus with mTLS mühürlü nodes.' },
-    { title: 'Sentinel', icon: Bot, content: 'Autonomous threat scoring and cluster blocking.' }
-  ]
-  return (
-    <section id="documentation" className="py-48 bg-zinc-50 dark:bg-zinc-900/20 border-y border-zinc-200 dark:border-white/5">
-      <div className="container mx-auto px-8 max-w-6xl flex flex-col lg:flex-row gap-20">
-        <div className="lg:w-1/3 space-y-6">
-          <h2 className="text-6xl font-black tracking-tighter dark:text-white text-zinc-950 underline decoration-blue-600 decoration-8 underline-offset-4">Docs.</h2>
-          {items.map((item, i) => (
-            <button key={i} onClick={() => setTab(i)} className={cn("w-full flex items-center gap-6 px-10 py-6 rounded-3xl font-black text-xs uppercase tracking-widest transition-all", tab === i ? "bg-blue-600 text-white shadow-2xl scale-105" : "text-zinc-400 dark:hover:bg-white/5")}>
-              <item.icon className="w-5 h-5" /> {item.title}
-            </button>
-          ))}
+  const [activeTab, setActiveTab] = useState(0)
+  
+  const docs = [
+    {
+      title: "Quick Start",
+      icon: TerminalSquare,
+      content: (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div>
+             <h3 className="text-2xl font-bold tracking-tight mb-2">Deployment</h3>
+             <p className="text-muted-foreground">Rampart is a single static binary. Install the controller and agent globally in seconds.</p>
+          </div>
+          <div className="code-block">
+             <span className="text-muted-foreground select-none">$ </span>
+             <span className="text-emerald-400">curl -sSL rampartfw.com/install | sh</span>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4 mt-6">
+             <div className="p-5 rounded-xl border border-border bg-muted/50">
+                <CheckCircle2 className="w-5 h-5 text-primary mb-2" />
+                <h4 className="font-semibold text-sm mb-1">Auto Discovery</h4>
+                <p className="text-xs text-muted-foreground">Detects OS, Arch, and kernel features (XDP) automatically.</p>
+             </div>
+             <div className="p-5 rounded-xl border border-border bg-muted/50">
+                <CheckCircle2 className="w-5 h-5 text-primary mb-2" />
+                <h4 className="font-semibold text-sm mb-1">Systemd Ready</h4>
+                <p className="text-xs text-muted-foreground">Hooks into init systems with pre-configured self-healing services.</p>
+             </div>
+          </div>
         </div>
-        <div className="lg:w-2/3 glass rounded-[4rem] p-12 md:p-20 border-zinc-200 dark:border-white/10 bg-white dark:bg-black/40">
-          <h3 className="text-4xl font-black mb-8 dark:text-white">{items[tab].title}</h3>
-          <p className="text-xl text-zinc-600 dark:text-zinc-400 font-bold mb-10 leading-relaxed">{items[tab].content}</p>
-          <div className="p-8 rounded-2xl bg-zinc-950 border border-white/10 font-mono text-emerald-400 shadow-inner">
-            <span className="text-zinc-500 mr-2">$</span> {tab === 0 ? 'rampart version' : 'rampart cluster status'}
+      )
+    },
+    {
+      title: "Architecture",
+      icon: Network,
+      content: (
+        <div className="space-y-6 animate-in fade-in duration-500">
+           <div>
+             <h3 className="text-2xl font-bold tracking-tight mb-2">Distributed Control Plane</h3>
+             <p className="text-muted-foreground">Rampart is designed for zero-single-point-of-failure clusters.</p>
+          </div>
+          <div className="p-6 rounded-xl bg-card border border-border space-y-4">
+             <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">1</div>
+                <div>
+                   <h5 className="font-semibold text-sm">mTLS Everywhere</h5>
+                   <p className="text-sm text-muted-foreground mt-1">All peer-to-peer traffic is encrypted and authenticated via internal CA.</p>
+                </div>
+             </div>
+             <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">2</div>
+                <div>
+                   <h5 className="font-semibold text-sm">Autonomous Quorum</h5>
+                   <p className="text-sm text-muted-foreground mt-1">Automatic leader election via Raft ensures 100% uptime during partitions.</p>
+                </div>
+             </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Sentinel IPS",
+      icon: Bot,
+      content: (
+        <div className="space-y-6 animate-in fade-in duration-500">
+           <div>
+             <h3 className="text-2xl font-bold tracking-tight mb-2">Otonom Threat Response</h3>
+             <p className="text-muted-foreground">Stop threats in milliseconds without human intervention.</p>
+          </div>
+          <div className="code-block border-rose-500/20 bg-[#0d1117]">
+             <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest text-rose-500">Sentinel Alert</span>
+             </div>
+             <p className="text-muted-foreground text-xs mb-2"># Real-time traffic analysis result</p>
+             <p className="text-sm text-zinc-300">{`> SCORING: IP 192.168.1.45 -> RISK 85 (Target 70)`}</p>
+             <p className="text-sm text-rose-400 font-semibold mt-1">{`> ACTION: Cluster-wide block applied via Raft.`}</p>
+          </div>
+        </div>
+      )
+    },
+  ]
+
+  return (
+    <section id="docs" className="py-24">
+      <div className="container mx-auto px-4 md:px-8">
+        <div className="flex flex-col lg:flex-row gap-12">
+          <div className="lg:w-1/3">
+            <h2 className="text-3xl font-bold mb-4 tracking-tight">Documentation</h2>
+            <p className="text-muted-foreground mb-8">Learn how to deploy and orchestrate your global security policy.</p>
+            
+            <div className="space-y-2 flex flex-col">
+              {docs.map((doc, idx) => (
+                <button 
+                  key={idx}
+                  onClick={() => setActiveTab(idx)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all text-left",
+                    activeTab === idx 
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <doc.icon className="w-4 h-4" />
+                  {doc.title}
+                  {activeTab === idx && <ArrowRight className="w-4 h-4 ml-auto opacity-50" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:w-2/3">
+             <div className="rounded-2xl border border-border bg-card p-6 md:p-10 shadow-sm min-h-[400px]">
+               <AnimatePresence mode="wait">
+                 <motion.div
+                   key={activeTab}
+                   initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                   transition={{ duration: 0.2 }}
+                 >
+                   {docs[activeTab].content}
+                 </motion.div>
+               </AnimatePresence>
+             </div>
           </div>
         </div>
       </div>
@@ -129,65 +391,71 @@ const Docs = () => {
   )
 }
 
-const App = () => (
-  <ThemeProvider>
-    <main className="bg-white dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-white selection:bg-blue-600/30 font-sans antialiased overflow-x-hidden">
-      <Navbar />
-      <section className="relative pt-40 pb-48 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[1200px] hero-glow pointer-events-none opacity-80" />
-        <div className="container mx-auto px-6 relative z-10 text-center max-w-6xl">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-            <span className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-blue-600/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-[0.4em] mb-12 shadow-sm backdrop-blur-md">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" /> v0.1.0 Initial Beta
-            </span>
-            <h1 className="text-7xl md:text-[9rem] font-black mb-12 tracking-tighter leading-[0.8] dark:text-white text-zinc-950">Autonomous <br /><span className="text-blue-600 drop-shadow-sm">Defense.</span></h1>
-            <p className="text-xl md:text-3xl text-zinc-600 dark:text-zinc-400 mb-16 max-w-4xl mx-auto font-medium tracking-tight">The first policy engine that thinks. Unified management for eBPF, nftables, and every Cloud provider.</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8"><button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white px-16 py-7 rounded-[2rem] font-black shadow-2xl text-xl">Get Started</button><button className="w-full sm:w-auto glass text-zinc-900 dark:text-white px-16 py-7 rounded-[2rem] font-black flex items-center justify-center gap-4 text-xl group border-2"><Github className="w-6 h-6 text-zinc-500" /> View Source</button></div>
-          </motion.div>
-          <CodePreview />
+const Releases = () => {
+  return (
+    <section id="releases" className="py-24 bg-muted/30 border-t border-border">
+      <div className="container mx-auto px-4 md:px-8">
+        <div className="max-w-4xl mx-auto">
+           <h2 className="text-3xl font-bold tracking-tight mb-8">Releases</h2>
+           
+           <div className="p-6 md:p-8 rounded-2xl bg-card border border-border flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+               <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-2xl">
+                    0.1
+                  </div>
+                  <div>
+                     <h4 className="text-2xl font-bold flex items-center gap-3">
+                       v0.1.0
+                       <Badge>Stable</Badge>
+                     </h4>
+                     <p className="text-sm text-muted-foreground mt-1">Initial Beta Release • April 2026</p>
+                  </div>
+               </div>
+               
+               <a href="https://github.com/ersinkoc/Rampart/releases/tag/v0.1.0">
+                 <Button className="gap-2 w-full md:w-auto">
+                   <Download className="w-4 h-4" /> Get Assets
+                 </Button>
+               </a>
+           </div>
         </div>
-      </section>
+      </div>
+    </section>
+  )
+}
 
-      <section id="features" className="py-48 bg-white dark:bg-zinc-950">
-        <div className="container mx-auto px-8 grid md:grid-cols-2 lg:grid-cols-3 gap-12">
-          {[
-            { icon: Cpu, title: 'eBPF XDP', desc: 'Driver-level filtering performance.' },
-            { icon: Bot, title: 'Sentinel', desc: 'Autonomous threat scoring.' },
-            { icon: Globe, title: 'Multi-Cloud', desc: 'Unified AWS, GCP, Azure orchestration.' },
-            { icon: RefreshCw, title: 'Self-Healing', desc: 'Watchdog drift correction.' },
-            { icon: Lock, title: 'mTLS Raft', desc: 'Cluster-wide consistency.' },
-            { icon: Search, title: 'L7 DPI', desc: 'Application-aware inspection.' }
-          ].map((f, i) => (
-            <motion.div key={i} whileHover={{ y: -12 }} className="p-12 rounded-[3.5rem] bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-white/5 hover:border-blue-500/30 transition-all group">
-              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-800 shadow-xl flex items-center justify-center mb-10 group-hover:bg-blue-600 group-hover:text-white transition-all scale-110"><f.icon className="w-8 h-8" /></div>
-              <h3 className="text-3xl font-black mb-4 dark:text-white text-zinc-950 tracking-tighter">{f.title}</h3>
-              <p className="text-zinc-500 dark:text-zinc-400 text-lg font-bold leading-relaxed">{f.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      <Docs />
-
-      <section id="releases" className="py-48 bg-white dark:bg-zinc-950">
-        <div className="container mx-auto px-8 max-w-4xl space-y-12">
-          <h2 className="text-6xl font-black tracking-tighter dark:text-white text-zinc-950 flex items-center gap-6"><Box className="w-12 h-12 text-blue-600" /> Releases.</h2>
-          <div className="p-12 rounded-[4rem] glass border-zinc-200 dark:border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-12 group transition-all hover:border-blue-500/30">
-            <div className="flex gap-10"><div className="w-24 h-24 rounded-[2rem] bg-blue-600 text-white flex items-center justify-center font-black text-3xl shadow-3xl">0.1</div><div className="space-y-4"><h4 className="text-4xl font-black dark:text-white text-zinc-950 tracking-tighter leading-none">v0.1.0 <span className="px-5 py-2 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase tracking-[0.3em] ml-4">Stable</span></h4><p className="text-xl text-zinc-500 font-bold">Initial Beta Release • April 2026</p></div></div>
-            <a href="https://github.com/ersinkoc/Rampart/releases" className="px-12 py-5 rounded-2xl bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 font-black text-sm flex items-center gap-4 hover:scale-110 active:scale-95 shadow-xl"><Download className="w-5 h-5" /> Assets</a>
-          </div>
-        </div>
-      </section>
-
-      <footer className="py-32 border-t border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-black">
-        <div className="container mx-auto px-8 flex flex-col md:flex-row items-center justify-between gap-20">
-          <div className="flex items-center gap-6 group shrink-0"><div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] flex items-center justify-center shadow-3xl group-hover:rotate-[-12deg] transition-all duration-700"><Shield className="text-white w-9 h-9" /></div><div className="flex flex-col"><span className="text-3xl font-black tracking-tighter dark:text-white text-zinc-950 leading-none">RAMPART</span><span className="text-[10px] font-black uppercase tracking-[0.6em] text-blue-600 mt-2">TACTICAL INTELLIGENCE</span></div></div>
-          <p className="text-zinc-500 font-bold text-lg max-w-sm text-center md:text-left leading-relaxed opacity-70">© 2026 Rampart Tactical Intelligence. Secure by design. High-performance by default.</p>
-          <div className="flex items-center gap-12 scale-150"><a href="https://github.com/ersinkoc/Rampart" className="text-zinc-400 hover:text-blue-600 transition-all"><Github /></a><a href="#" className="text-zinc-400 hover:text-blue-600 transition-all"><Globe /></a></div>
-        </div>
-      </footer>
-    </main>
-  </ThemeProvider>
+const Footer = () => (
+  <footer className="py-12 border-t border-border bg-background">
+    <div className="container mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="flex items-center gap-2">
+        <Shield className="text-primary w-5 h-5" />
+        <span className="font-bold tracking-tight">Rampart</span>
+      </div>
+      <p className="text-muted-foreground text-sm text-center">
+        © 2026 Rampart Tactical Intelligence. Licensed under Apache 2.0.
+      </p>
+      <div className="flex items-center gap-4">
+        <a href="https://github.com/ersinkoc/Rampart" className="text-muted-foreground hover:text-foreground transition-colors">
+          <GitBranch className="w-5 h-5" />
+        </a>
+      </div>
+    </div>
+  </footer>
 )
+
+const App = () => {
+  return (
+    <ThemeProvider>
+      <main className="min-h-screen">
+        <Navbar />
+        <Hero />
+        <Features />
+        <Docs />
+        <Releases />
+        <Footer />
+      </main>
+    </ThemeProvider>
+  )
+}
 
 export default App

@@ -9,9 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
     "framer-motion": "^11.0.0",
-    "lucide-react": "^0.446.0",
+    "lucide-react": "^1.8.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.3.0"

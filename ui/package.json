@@ -19,6 +19,7 @@
     "react": "^19.0.0-rc.0",
     "react-dom": "^19.0.0-rc.0",
     "react-router-dom": "^7.0.0",
+    "recharts": "^3.8.1",
     "tailwind-merge": "^2.6.1"
   },
   "devDependencies": {

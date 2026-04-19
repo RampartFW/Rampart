@@ -113,6 +113,7 @@ var subcommands = []Subcommand{
 	&AuditCommand{},
 	&CertCommand{},
 	&ClusterCommand{},
+	&DashboardCommand{},
 	&FmtCommand{},
 	&PlanCommand{},
 	&RollbackCommand{},

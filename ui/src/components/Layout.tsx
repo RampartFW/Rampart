@@ -13,10 +13,13 @@ import {
   X,
   Shield,
   Search,
-  Bell
+  Bell,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useTheme } from '../App';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -29,6 +32,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
+  const { isDark, toggle } = useTheme();
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -43,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans antialiased text-zinc-900 dark:text-zinc-100">
-      {/* Mobile sidebar overlay */}
+      {/* ... sidebars ... */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-zinc-950/60 backdrop-blur-sm lg:hidden" 
@@ -120,6 +124,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
 
             <div className="flex items-center gap-4">
+               <button 
+                 onClick={toggle}
+                 className="p-2.5 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-all"
+               >
+                 {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+               </button>
                <button className="p-2.5 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/[0.05] relative transition-all">
                  <Bell className="h-5 w-5" />
                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900" />
